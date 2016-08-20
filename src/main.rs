@@ -1,10 +1,14 @@
 extern crate clap;
 extern crate conv;
+extern crate fern;
 extern crate hyper;
+#[macro_use]
+extern crate log;
 extern crate rustc_serialize;
 
 
 mod args;
+mod logging;
 
 
 use std::io::Read;
@@ -15,10 +19,12 @@ use rustc_serialize::json::Json;
 
 fn main() {
     let opts = args::parse();
+    logging::init(opts.verbose()).unwrap();
 
+    // TODO: replace with actual functionality
     let resp = get_http_json("http://www.mocky.io/v2/57b7d0e1110000d3018dedc4");
     let (key, value) = resp.as_object().unwrap().into_iter().next().unwrap();
-    println!("{} {}", key, value.as_string().unwrap());
+    info!("{} {}", key, value.as_string().unwrap());
 }
 
 
