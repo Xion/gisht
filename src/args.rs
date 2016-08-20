@@ -27,31 +27,38 @@ pub fn parse_from_argv<I, T>(argv: I) -> Options
 
 
 /// Structure to hold options received from the command line.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Options {
+    /// Verbosity of the logging output.
+    ///
+    /// Corresponds to the number of times the -v flag has been passed.
+    /// If -q has been used instead, this will be negative.
+    pub verbosity: isize,
+
     /// Gist command that's been issued, if any.
     pub command: Option<Command>,
-    /// Verbosity of the logging output.
-    /// Corresponds to the number of times the -v flag has been passed.
-    pub verbosity: isize,
 }
 
 impl Options {
     #[inline]
     pub fn verbose(&self) -> bool { self.verbosity > 0 }
+    #[inline]
+    pub fn quiet(&self) -> bool { self.verbosity < 0 }
 }
 
 impl<'a> From<ArgMatches<'a>> for Options {
     fn from(matches: ArgMatches<'a>) -> Self {
+        let verbose_count = matches.occurrences_of(OPT_VERBOSE) as isize;
+        let quiet_count = matches.occurrences_of(OPT_QUIET) as isize;
         Options{
+            verbosity: verbose_count - quiet_count,
             command: Command::try_from(matches.subcommand()).ok().or(None),
-            verbosity: matches.occurrences_of(OPT_VERBOSE) as isize,
         }
     }
 }
 
 
-/// Gist command issued to the application.
+/// Gist command issued to the application, along with its arguments.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command {
     // TODO: add params
@@ -94,6 +101,7 @@ const APP_NAME: &'static str = "gisht";
 const APP_DESC: &'static str = "Gists in the shell";
 
 const OPT_VERBOSE: &'static str = "verbose";
+const OPT_QUIET: &'static str = "quiet";
 
 
 /// Create the argument parser.
@@ -113,7 +121,13 @@ fn create_parser<'p>() -> Parser<'p> {
         .arg(Arg::with_name(OPT_VERBOSE)
             .long("verbose").short("v")
             .set(ArgSettings::Multiple)
+            .conflicts_with(OPT_QUIET)
             .help("Increase logging verbosity"))
+        .arg(Arg::with_name(OPT_QUIET)
+            .long("quiet").short("q")
+            .set(ArgSettings::Multiple)
+            .conflicts_with(OPT_VERBOSE)
+            .help("Decrease logging verbosity"))
         .help_short("H")
         .version_short("V")
 

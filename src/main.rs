@@ -1,13 +1,20 @@
-extern crate clap;
-extern crate conv;
-extern crate fern;
-extern crate hyper;
-#[macro_use]
-extern crate log;
-extern crate rustc_serialize;
+//!
+//! gisht -- Gists in the shell
+//!
+
+             extern crate clap;
+             extern crate conv;
+             extern crate fern;
+             extern crate hyper;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate log;
+#[macro_use] extern crate maplit;
+             extern crate regex;
+             extern crate rustc_serialize;
 
 
 mod args;
+mod gist;
 mod logging;
 
 

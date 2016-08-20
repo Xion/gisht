@@ -9,5 +9,8 @@ clap = { version = "2.2.4", features = ["suggestions"] }
 conv = "0.3"
 fern = "0.3"
 hyper = { version = "0.9" }
+lazy_static = "*"
 log = "0.3"
+maplit = "0.1"
+regex = "0.1"
 rustc-serialize = "0.3"
