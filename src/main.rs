@@ -15,6 +15,7 @@
 
 mod args;
 mod gist;
+mod github;
 mod logging;
 
 
