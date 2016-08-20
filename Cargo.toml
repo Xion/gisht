@@ -6,3 +6,4 @@ authors = ["Karol Kuczmarski <karol.kuczmarski@gmail.com>"]
 
 [dependencies]
 hyper = { version = "0.9" }
+rustc-serialize = "0.3"
