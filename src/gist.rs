@@ -11,8 +11,8 @@ use regex::Regex;
 use github::GitHub;
 
 
-/// Represents a gists' host: a (web) service that hosts code snippets,
-/// such as gist.github.com.
+/// Represents a gists' host: a (web) service that hosts gists (code snippets).
+/// Examples include gist.github.com.
 pub trait Host : Send + Sync {
     // Returns a user-visible name of the gists' host.
     fn name(&self) -> &str;
@@ -40,22 +40,28 @@ const DEFAULT_HOST_ID: &'static str = "gh";
 /// where the ID part can be omitted to assume the default.
 #[derive(Clone)]
 pub struct Uri {
-    pub host: Arc<Host>,
+    pub host_id: String,
     pub owner: String,
     pub name: String,
 }
 impl Uri {
     /// Construct a gist URI from given fragments.
-    pub fn new<'h, A, N>(host_id: &'h str, owner: A, name: N) -> Result<Uri, UriError>
-        where A: ToString, N: ToString
+    pub fn new<H, A, N>(host_id: H, owner: A, name: N) -> Result<Uri, UriError>
+        where H: AsRef<str> + ToString, A: ToString, N: ToString
     {
-        let host = try!(HOSTS.get(host_id)
-            .ok_or_else(|| UriError::UnknownHost(host_id.to_owned())));
+        if !HOSTS.contains_key(host_id.as_ref()) {
+            return Err(UriError::UnknownHost(host_id.to_string()));
+        }
         Ok(Uri{
-            host: host.clone(),
+            host_id: host_id.to_string(),
             owner: owner.to_string(),
             name: name.to_string(),
         })
+    }
+
+    #[inline]
+    pub fn host(&self) -> &Host {
+        let host = HOSTS.get(&self.host_id as &str).unwrap(); &**host
     }
 }
 impl FromStr for Uri {
@@ -77,13 +83,13 @@ impl FromStr for Uri {
 }
 impl fmt::Display for Uri {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{}:{}/{}", self.host.name(), self.owner, self.name)
+        write!(fmt, "{}:{}/{}", self.host_id, self.owner, self.name)
     }
 }
 impl fmt::Debug for Uri {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "Uri{{host={}, owner={}, name={}}}",
-            self.host.name(), self.owner, self.name)
+        write!(fmt, "Uri{{\"{}\", owner={}, name={}}}",
+            self.host_id, self.owner, self.name)
     }
 }
 
