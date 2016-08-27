@@ -27,6 +27,7 @@ impl GitHub {
 impl gist::Host for GitHub {
     fn name(&self) -> &str { "GitHub" }
 
+    /// Get URIs to GitHub gists belonging to given owner.
     fn gists(&self, owner: &str) -> Vec<gist::Uri> {
         let http = Client::new();
 

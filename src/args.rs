@@ -3,10 +3,13 @@
 use std::env;
 use std::ffi::OsString;
 use std::iter::IntoIterator;
+use std::str::FromStr;
 
 use clap::{self, AppSettings, Arg, ArgMatches, ArgSettings, SubCommand};
 use conv::TryFrom;
 use conv::errors::Unrepresentable;
+
+use super::gist;
 
 
 /// Parse command line arguments and return matches' object.
@@ -34,9 +37,10 @@ pub struct Options {
     /// Corresponds to the number of times the -v flag has been passed.
     /// If -q has been used instead, this will be negative.
     pub verbosity: isize,
-
     /// Gist command that's been issued, if any.
     pub command: Option<Command>,
+    /// URI to the gist to operate on, if any.
+    pub gist: Option<gist::Uri>,
 }
 
 impl Options {
@@ -50,9 +54,20 @@ impl<'a> From<ArgMatches<'a>> for Options {
     fn from(matches: ArgMatches<'a>) -> Self {
         let verbose_count = matches.occurrences_of(OPT_VERBOSE) as isize;
         let quiet_count = matches.occurrences_of(OPT_QUIET) as isize;
+
+        // Command may be optionally provided, alongside the gist argument.
+        let command = Command::try_from(matches.subcommand()).ok();
+        let gist = command.as_ref()
+            .and_then(|subcmd| matches.subcommand_matches(subcmd.name()))
+            .and_then(|m| m.value_of(ARG_GIST))
+            // TODO: fix error handling here (it should be TryFrom,
+            // and failed gist URI parsing should return Err)
+            .map(|g| gist::Uri::from_str(g).unwrap());
+
         Options{
             verbosity: verbose_count - quiet_count,
-            command: Command::try_from(matches.subcommand()).ok().or(None),
+            command: command,
+            gist: gist,
         }
     }
 }
@@ -61,14 +76,17 @@ impl<'a> From<ArgMatches<'a>> for Options {
 /// Gist command issued to the application, along with its arguments.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command {
-    // TODO: add params
+    /// Run the specified gist.
     Run,
+    /// Output the path to gist's binary.
+    Which,
 }
 
 impl Command {
     fn name(&self) -> &'static str {
         match *self {
             Command::Run => "run",
+            Command::Which => "which",
         }
     }
 }
@@ -84,6 +102,7 @@ impl<'p, 's, 'a> TryFrom<(&'s str, Option<&'p ArgMatches<'a>>)> for Command {
     fn try_from(input: (&'s str, Option<&'p ArgMatches<'a>>)) -> Result<Self, Self::Err> {
         match input {
             ("run", Some(_)) => Ok(Command::Run),
+            ("which", Some(_)) => Ok(Command::Which),
             (cmd, _) => Err(Unrepresentable(cmd.to_owned())),
         }
     }
@@ -100,6 +119,7 @@ type Parser<'p> = clap::App<'p, 'p>;
 const APP_NAME: &'static str = "gisht";
 const APP_DESC: &'static str = "Gists in the shell";
 
+const ARG_GIST: &'static str = "gist";
 const OPT_VERBOSE: &'static str = "verbose";
 const OPT_QUIET: &'static str = "quiet";
 
@@ -132,6 +152,15 @@ fn create_parser<'p>() -> Parser<'p> {
         .version_short("V")
 
         .subcommand(SubCommand::with_name(Command::Run.name())
-            .about("Run the specified gist"))
-
+            .about("Run the specified gist")
+            .arg(Arg::with_name(ARG_GIST)
+                .required(true)
+                .help("Gist to run")
+                .value_name("GIST")))
+        .subcommand(SubCommand::with_name(Command::Which.name())
+            .about("Output the path to gist's binary")
+            .arg(Arg::with_name(ARG_GIST)
+                .required(true)
+                .help("Gist to locate")
+                .value_name("GIST")))
 }

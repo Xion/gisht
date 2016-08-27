@@ -56,7 +56,7 @@ impl Header for Link {
 impl HeaderFormat for Link {
     fn fmt_header(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "{}", self.0.values()
-            .map(|li| format!("<{}>, rel=\"{}\"", li.url, li.rel))
+            .map(|li| format!("<{}>; rel=\"{}\"", li.url, li.rel))
             .collect::<Vec<_>>().join(", "))
     }
 }
