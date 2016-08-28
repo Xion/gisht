@@ -2,11 +2,10 @@
 
 use std::collections::HashMap;
 use std::io;
-use std::path::Path;
 use std::sync::Arc;
 
 use github::GitHub;
-use super::uri::Uri;
+use super::Gist;
 
 
 /// Represents a gists' host: a (web) service that hosts gists (code snippets).
@@ -15,12 +14,15 @@ pub trait Host : Send + Sync {
     // Returns a user-visible name of the gists' host.
     fn name(&self) -> &str;
     /// List all the gists of given owner.
-    // TODO: change this to  fn iter_gists(...) -> impl Iterator<Item=Uri>
+    // TODO: change this to  fn iter_gists(...) -> impl Iterator<Item=Gist>
     // when it's supported in stable Rust
-    fn gists(&self, owner: &str) -> Vec<Uri>;
-    /// Download a gist to given directory.
-    /// Note that the directory may not necessarily exist.
-    fn download_gist(&self, uri: Uri, dir: &Path) -> io::Result<()>;
+    fn gists(&self, owner: &str) -> Vec<Gist>;
+    /// Download a current version of the gist.
+    ///
+    /// If the gist has been downloaded previously,
+    /// it may be updated instead (e.g. via pull rather than clone
+    /// if its a Git repo).
+    fn download_gist(&self, gist: Gist) -> io::Result<()>;
 }
 
 

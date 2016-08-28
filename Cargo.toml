@@ -10,6 +10,7 @@ conv = "0.3"
 custom_derive = "*"
 enum_derive = "*"
 fern = "0.3"
+git2 = "0.4.4"
 hyper = { version = "0.9" }
 lazy_static = "*"
 log = "0.3"

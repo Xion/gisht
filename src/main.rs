@@ -7,6 +7,7 @@
 #[macro_use] extern crate custom_derive;
 #[macro_use] extern crate enum_derive;
              extern crate fern;
+             extern crate git2;
              extern crate hyper;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
@@ -17,6 +18,7 @@
 
 
 mod args;
+mod ext;
 mod gist;
 mod github;
 mod logging;
@@ -66,8 +68,8 @@ fn main() {
     // TODO: replace with actual functionality
     use gist::Host;
     let gh = github::GitHub::new();
-    for gist_uri in gh.gists("Xion") {
-        println!("{}", gist_uri);
+    for gist in gh.gists("Xion") {
+        println!("{}", gist.uri);
     }
 }
 

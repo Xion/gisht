@@ -15,7 +15,22 @@ pub use self::uri::Uri;
 /// Structure representing a single gist.
 #[derive(Debug, Clone)]
 pub struct Gist {
+    /// URI to the gist.
     pub uri: Uri,
+    /// Alternative, host-specific ID of the gist.
+    pub id: Option<String>,
+}
+
+impl Gist {
+    #[inline]
+    pub fn new<I: ToString>(uri: Uri, id: I) -> Gist {
+        Gist{uri: uri, id: Some(id.to_string())}
+    }
+
+    #[inline]
+    pub fn from_uri(uri: Uri) -> Self {
+        Gist{uri: uri, id: None}
+    }
 }
 
 impl Gist {
@@ -35,6 +50,8 @@ impl Gist {
 
     /// Whether the gist has been downloaded previously.
     pub fn is_local(&self) -> bool {
-        self.path().exists()
+        // Path::exists() will traverse symlinks, so this also ensures
+        // that the target "binary" file of the gist exists.
+        self.binary_path().exists()
     }
 }
