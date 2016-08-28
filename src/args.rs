@@ -6,7 +6,6 @@ use std::iter::IntoIterator;
 use std::str::FromStr;
 
 use clap::{self, AppSettings, Arg, ArgMatches, ArgSettings, SubCommand};
-use conv::TryFrom;
 use conv::errors::Unrepresentable;
 
 use super::gist;
@@ -56,9 +55,9 @@ impl<'a> From<ArgMatches<'a>> for Options {
         let quiet_count = matches.occurrences_of(OPT_QUIET) as isize;
 
         // Command may be optionally provided, alongside the gist argument.
-        let command = Command::try_from(matches.subcommand()).ok();
-        let gist = command.as_ref()
-            .and_then(|subcmd| matches.subcommand_matches(subcmd.name()))
+        let (subcmd, submatches) = matches.subcommand();
+        let command = Command::from_str(subcmd).ok();
+        let gist = submatches
             .and_then(|m| m.value_of(ARG_GIST))
             // TODO: fix error handling here (it should be TryFrom,
             // and failed gist URI parsing should return Err)
@@ -73,13 +72,16 @@ impl<'a> From<ArgMatches<'a>> for Options {
 }
 
 
-/// Gist command issued to the application, along with its arguments.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Command {
-    /// Run the specified gist.
-    Run,
-    /// Output the path to gist's binary.
-    Which,
+custom_derive! {
+    /// Gist command issued to the application, along with its arguments.
+    #[derive(Clone, Debug, Eq, PartialEq,
+             IterVariants(Commands))]
+    pub enum Command {
+        /// Run the specified gist.
+        Run,
+        /// Output the path to gist's binary.
+        Which,
+    }
 }
 
 impl Command {
@@ -95,15 +97,15 @@ impl Default for Command {
     fn default() -> Self { Command::Run }
 }
 
-// Create a Command from the result of clap::ArgMatches::subcommand().
-impl<'p, 's, 'a> TryFrom<(&'s str, Option<&'p ArgMatches<'a>>)> for Command {
+impl FromStr for Command {
     type Err = Unrepresentable<String>;
 
-    fn try_from(input: (&'s str, Option<&'p ArgMatches<'a>>)) -> Result<Self, Self::Err> {
-        match input {
-            ("run", Some(_)) => Ok(Command::Run),
-            ("which", Some(_)) => Ok(Command::Which),
-            (cmd, _) => Err(Unrepresentable(cmd.to_owned())),
+    /// Create a Command from the result of clap::ArgMatches::subcommand_name().
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "run" => Ok(Command::Run),
+            "which" => Ok(Command::Which),
+            _ => Err(Unrepresentable(s.to_owned())),
         }
     }
 }
@@ -163,4 +165,18 @@ fn create_parser<'p>() -> Parser<'p> {
                 .required(true)
                 .help("Gist to locate")
                 .value_name("GIST")))
+}
+
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+    use super::Command;
+
+    #[test]
+    fn command_names() {
+        for cmd in Command::iter_variants() {
+            assert_eq!(cmd, Command::from_str(cmd.name()).unwrap());
+        }
+    }
 }

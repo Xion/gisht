@@ -1,7 +1,8 @@
 //! Module implementing GitHub as gist host.
 
-use std::io::Read;
+use std::io::{self, Read};
 use std::marker::PhantomData;
+use std::path::Path;
 
 use hyper::client::{Client, Response};
 use hyper::header::{ContentLength, UserAgent};
@@ -81,6 +82,10 @@ impl gist::Host for GitHub {
             break;
         }
         result
+    }
+
+    fn download_gist(&self, uri: gist::Uri, path: &Path) -> io::Result<()> {
+        unimplemented!();
     }
 }
 
