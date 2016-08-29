@@ -97,15 +97,29 @@ fn main() {
 
 
 /// Run the specified gist.
+/// Regardless whether or not it succceeds, this function does not return.
 // TODO: accept arguments
-fn run_gist(gist: &Gist) {
+fn run_gist(gist: &Gist) -> ! {
     let uri = gist.uri.clone();
-    let mut run = Command::new(gist.binary_path()).spawn()
-        .unwrap_or_else(|e| panic!("Failed to execute gist {}: {}", uri, e));
+    let mut command = Command::new(gist.binary_path());
 
-    // Propagate thes same exit code that the gist binary returned.
-    let exit_status = run.wait()
-        .unwrap_or_else(|e| panic!("Failed to obtain status code for gist {}: {}", uri, e));
-    let exit_code = exit_status.code().unwrap_or(127);
-    exit(exit_code);
+    // On Unix, we can replace the app's process completely with gist's executable
+    // but on Windows, we have to run it as a child process and wait for it.
+    if cfg!(unix) {
+        use std::os::unix::process::CommandExt;
+
+        // This calls execvp() and doesn't return unless an error occurred.
+        // The process isn't really usable afterwards, so we just panic.
+        let error = command.exec();
+        panic!("Failed to execute gist {}: {}", uri, error);
+    } else {
+        let mut run = command.spawn()
+            .unwrap_or_else(|e| panic!("Failed to execute gist {}: {}", uri, e));
+
+        // Propagate thes same exit code that the gist binary returned.
+        let exit_status = run.wait()
+            .unwrap_or_else(|e| panic!("Failed to obtain status code for gist {}: {}", uri, e));
+        let exit_code = exit_status.code().unwrap_or(127);
+        exit(exit_code);
+    }
 }
