@@ -19,7 +19,7 @@ use super::Host;
 /// where the host_id part can be omitted to assume the default,
 /// and owner can be passed on as well if the name itself is identifier enough
 /// (this is usually host-specific).
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Uri {
     pub host_id: String,
     pub owner: String,
@@ -64,7 +64,7 @@ impl FromStr for Uri {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         lazy_static!{
             static ref RE: Regex = Regex::new(
-                r"(?P<host>(\w+):)?((?P<owner>\w+)/)?(?P<name>\w+)"
+                r"(?P<host>(\w+):)?((?P<owner>\w+)/)?(?P<name>.+)"
             ).unwrap();
         }
         let parsed = try!(RE.captures(s)
@@ -85,7 +85,6 @@ impl Into<PathBuf> for Uri {
         }
         path.push(self.name);
         path
-
     }
 }
 

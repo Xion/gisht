@@ -1,5 +1,6 @@
 //! Module implementing GitHub as gist host.
 
+use std::fs;
 use std::io::{self, Read};
 use std::marker::PhantomData;
 
@@ -11,7 +12,7 @@ use url::Url;
 
 use ext::hyper::header::Link;
 use gist::{self, Gist};
-use util::symlink_file;
+use util::{mark_executable, symlink_file};
 use super::USER_AGENT;
 
 
@@ -90,7 +91,7 @@ impl gist::Host for GitHub {
     ///
     /// If the gist hasn't been downloaded already, a clone of the gist's Git repo is performed.
     /// Otherwise, it's just a simple Git pull.
-    fn download_gist(&self, gist: Gist) -> io::Result<()> {
+    fn download_gist(&self, gist: &Gist) -> io::Result<()> {
         if gist.uri.host_id != "gh" {
             return Err(io::Error::new(io::ErrorKind::InvalidData, format!(
                 "expected a GitHub Gist, but got a '{}' one", gist.uri.host_id)));
@@ -126,13 +127,21 @@ impl gist::Host for GitHub {
             clone_url
         };
 
-        try!(Repository::clone(&clone_url, gist.path())
+        // Create the gist's directory and clone it as a Git repo there.
+        let path = gist.path();
+        try!(fs::create_dir_all(&path));
+        try!(Repository::clone(&clone_url, &path)
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
 
+        // Make sure the gist's executable is, in fact, executable.
+        let executable = gist.path().join(&gist.uri.name);
+        try!(mark_executable(&executable));
+
+        // Symlink the main/binary file to the binary directory.
         let binary = gist.binary_path();
         if !binary.exists() {
-            let executable = gist.path().join(gist.uri.name);
-            try!(symlink_file(executable, binary));
+            try!(fs::create_dir_all(binary.parent().unwrap()));
+            try!(symlink_file(&executable, &binary));
         }
 
         Ok(())

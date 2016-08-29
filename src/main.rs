@@ -27,6 +27,9 @@ mod util;
 
 use std::env;
 use std::path::PathBuf;
+use std::process::{Command, exit};
+
+use gist::Gist;
 
 
 lazy_static!{
@@ -65,11 +68,44 @@ fn main() {
     let opts = args::parse();
     logging::init(opts.verbose()).unwrap();
 
-    // TODO: replace with actual functionality
-    use gist::Host;
-    let gh = github::GitHub::new();
-    for gist in gh.gists("Xion") {
-        println!("{}", gist.uri);
+    // TODO: ensure application direcotry exists
+
+    if let Some(cmd) = opts.command {
+        let gist_uri = opts.gist.unwrap();
+        debug!("Gist {} specified as the argument", gist_uri);
+
+        let host = gist_uri.host();
+        let gists = host.gists(&gist_uri.owner);
+        let gist = match gists.iter().find(|g| gist_uri == g.uri) {
+            Some(gist) => gist,
+            _ => { error!("Gist {} not found", gist_uri); exit(2); },
+        };
+
+        if !gist.is_local() {
+            if let Err(err) = host.download_gist(&gist) {
+                error!("Failed to download gist {}: {}", gist.uri, err);
+                exit(2);
+            }
+        }
+
+        match cmd {
+            args::Command::Run => run_gist(gist),
+            _ => unimplemented!(),
+        }
     }
 }
 
+
+/// Run the specified gist.
+// TODO: accept arguments
+fn run_gist(gist: &Gist) {
+    let uri = gist.uri.clone();
+    let mut run = Command::new(gist.binary_path()).spawn()
+        .unwrap_or_else(|e| panic!("Failed to execute gist {}: {}", uri, e));
+
+    // Propagate thes same exit code that the gist binary returned.
+    let exit_status = run.wait()
+        .unwrap_or_else(|e| panic!("Failed to obtain status code for gist {}: {}", uri, e));
+    let exit_code = exit_status.code().unwrap_or(127);
+    exit(exit_code);
+}
