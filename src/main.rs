@@ -9,6 +9,7 @@
              extern crate fern;
              extern crate git2;
              extern crate hyper;
+             extern crate isatty;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 #[macro_use] extern crate maplit;
@@ -26,6 +27,8 @@ mod util;
 
 
 use std::env;
+use std::fs;
+use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::{Command, exit};
 
@@ -68,7 +71,15 @@ fn main() {
     let opts = args::parse();
     logging::init(opts.verbose()).unwrap();
 
-    // TODO: ensure application direcotry exists
+    // If this is a first run and it's interactive,
+    // display a warning about executing untrusted code.
+    if !APP_DIR.exists() && isatty::stdout_isatty() {
+        display_warning();
+        if !fs::create_dir_all(&*APP_DIR).is_ok() {
+            error!("Failed to create application directory ({})", APP_DIR.display());
+            exit(1);
+        }
+    }
 
     if let Some(cmd) = opts.command {
         let gist_uri = opts.gist.unwrap();
@@ -96,6 +107,29 @@ fn main() {
             args::Command::Run => run_gist(&gist),
             _ => unimplemented!(),
         }
+    }
+}
+
+/// Display warning about executing untrusted code and ask the user to continue.
+/// If declined, the program will end.
+fn display_warning() {
+    const WARNING: &'static [&'static str] = &[
+        "WARNING: gisht is used to download & run code from a remote source.",
+        "",
+        "Never run gists that you haven't authored, and/or do not trust.",
+        "Doing so is dangerous, and may expose your system to security risks!",
+        "",
+        "(If you continue, this warning won't be shown again).",
+        "",
+    ];
+    writeln!(&mut io::stderr(), "{}", WARNING.join(util::LINESEP)).unwrap();
+
+    write!(&mut io::stderr(), "{}", "Do you want to continue? [y/N]: ").unwrap();
+    let mut answer = String::with_capacity(1);
+    io::stdin().read_line(&mut answer).unwrap();
+
+    if answer.trim().to_lowercase() != "y" {
+        exit(2);
     }
 }
 

@@ -5,6 +5,13 @@ use std::io;
 use std::path::Path;
 
 
+#[cfg(windows)]
+pub const LINESEP: &'static str = "\r\n";
+#[cfg(not(windows))]
+pub const LINESEP: &'static str = "\n";
+
+
+
 /// Create a symlink to a regular file.
 #[cfg(unix)]
 pub fn symlink_file<S, D>(src: S, dst: D) -> io::Result<()>
