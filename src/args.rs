@@ -111,6 +111,8 @@ impl FromStr for Command {
         match s {
             "run" => Ok(Command::Run),
             "which" => Ok(Command::Which),
+            "print" => Ok(Command::Print),
+            "open" => Ok(Command::Open),
             _ => Err(Unrepresentable(s.to_owned())),
         }
     }
