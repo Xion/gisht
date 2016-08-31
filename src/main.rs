@@ -73,11 +73,14 @@ fn main() {
 
     // If this is a first run and it's interactive,
     // display a warning about executing untrusted code.
-    if !APP_DIR.exists() && isatty::stdout_isatty() {
-        display_warning();
-        if !fs::create_dir_all(&*APP_DIR).is_ok() {
-            error!("Failed to create application directory ({})", APP_DIR.display());
-            exit(1);
+    if !APP_DIR.exists() {
+        if isatty::stdout_isatty() && !opts.quiet() {
+            display_warning();
+            if let Err(err) = fs::create_dir_all(&*APP_DIR) {
+                error!("Failed to create application directory ({}): {}",
+                    APP_DIR.display(), err);
+                exit(1);
+            }
         }
     }
 
@@ -105,6 +108,7 @@ fn main() {
 
         match cmd {
             args::Command::Run => run_gist(&gist),
+            args::Command::Which => print_binary_path(&gist),
             _ => unimplemented!(),
         }
     }
@@ -160,4 +164,11 @@ fn run_gist(gist: &Gist) -> ! {
         let exit_code = exit_status.code().unwrap_or(127);
         exit(exit_code);
     }
+}
+
+/// Output the gist's binary path.
+fn print_binary_path(gist: &Gist) -> ! {
+    trace!("Printing binary path of {:?}", gist);
+    println!("{}", gist.binary_path().display());
+    exit(0);
 }
