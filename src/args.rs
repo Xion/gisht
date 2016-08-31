@@ -81,6 +81,10 @@ custom_derive! {
         Run,
         /// Output the path to gist's binary.
         Which,
+        /// Print the complete source code of the gist's binary.
+        Print,
+        /// Open the gist's HTML page in the default web browser.
+        Open,
     }
 }
 
@@ -89,6 +93,8 @@ impl Command {
         match *self {
             Command::Run => "run",
             Command::Which => "which",
+            Command::Print => "print",
+            Command::Open => "open",
         }
     }
 }
@@ -155,16 +161,24 @@ fn create_parser<'p>() -> Parser<'p> {
 
         .subcommand(SubCommand::with_name(Command::Run.name())
             .about("Run the specified gist")
-            .arg(Arg::with_name(ARG_GIST)
-                .required(true)
-                .help("Gist to run")
-                .value_name("GIST")))
+            .arg(gist_arg("Gist to run")))
         .subcommand(SubCommand::with_name(Command::Which.name())
             .about("Output the path to gist's binary")
-            .arg(Arg::with_name(ARG_GIST)
-                .required(true)
-                .help("Gist to locate")
-                .value_name("GIST")))
+            .arg(gist_arg("Gist to locate")))
+        .subcommand(SubCommand::with_name(Command::Print.name())
+            .about("Print the source code of gist's binary")
+            .arg(gist_arg("Gist to print")))
+        .subcommand(SubCommand::with_name(Command::Open.name())
+            .about("Open the gist's webpage")
+            .arg(gist_arg("Gist to open")))
+}
+
+/// Create the GIST argument to various gist subcommands.
+fn gist_arg(help: &'static str) -> Arg {
+    Arg::with_name(ARG_GIST)
+        .required(true)
+        .help(help)
+        .value_name("GIST")
 }
 
 
