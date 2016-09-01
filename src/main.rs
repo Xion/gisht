@@ -28,7 +28,7 @@ mod util;
 
 use std::env;
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, exit};
 
@@ -109,8 +109,11 @@ fn main() {
         match cmd {
             args::Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
             args::Command::Which => print_binary_path(&gist),
+            args::Command::Print => print_gist(&gist),
             _ => unimplemented!(),
         }
+    } else {
+        debug!("No gist command specified -- exiting.");
     }
 }
 
@@ -171,5 +174,18 @@ fn run_gist(gist: &Gist, args: &[String]) -> ! {
 fn print_binary_path(gist: &Gist) -> ! {
     trace!("Printing binary path of {:?}", gist);
     println!("{}", gist.binary_path().display());
+    exit(0);
+}
+
+/// Print the source of the gist's binary.
+fn print_gist(gist: &Gist) -> ! {
+    trace!("Printing source code of {:?}", gist);
+    let binary = fs::File::open(gist.binary_path())
+        .unwrap_or_else(|e| panic!("Failed to open the binary of gist {}: {}", gist.uri, e));
+    for byte in binary.bytes() {
+        let byte = byte
+            .unwrap_or_else(|e| panic!("Falled to read to the binary of gist {}: {}", gist.uri, e));
+        io::stdout().write_all(&[byte]).unwrap();
+    }
     exit(0);
 }
