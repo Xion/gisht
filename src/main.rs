@@ -35,7 +35,7 @@ use std::process::{Command, exit};
 use gist::Gist;
 
 
-lazy_static!{
+lazy_static! {
     /// User-Agent header that the program uses for all outgoing HTTP requests.
     static ref USER_AGENT: String =
         if let Some(version) = option_env!("CARGO_PKG_VERSION") {
@@ -45,7 +45,7 @@ lazy_static!{
         };
 }
 
-lazy_static!{
+lazy_static! {
     /// Main application's directory.
     static ref APP_DIR: PathBuf = {
         let mut dir = env::home_dir().unwrap_or_else(|| env::temp_dir());

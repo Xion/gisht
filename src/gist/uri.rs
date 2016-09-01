@@ -62,7 +62,7 @@ impl FromStr for Uri {
 
     /// Create the gist URI from its string representation.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        lazy_static!{
+        lazy_static! {
             static ref RE: Regex = Regex::new(
                 r"(?P<host>(\w+):)?((?P<owner>\w+)/)?(?P<name>.+)"
             ).unwrap();

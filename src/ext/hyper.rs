@@ -31,7 +31,7 @@ pub mod header {
         fn header_name() -> &'static str { "Link" }
 
         fn parse_header(raw: &[Vec<u8>]) -> hyper::Result<Link> {
-            lazy_static!{
+            lazy_static! {
                 static ref RE: Regex = RegexBuilder::new(r#"
                     \<(?P<url>[^>]+)\>;
                     \s*

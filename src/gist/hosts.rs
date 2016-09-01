@@ -28,7 +28,7 @@ pub trait Host : Send + Sync {
 }
 
 
-lazy_static!{
+lazy_static! {
     /// Mapping of gist host identifiers (like "gh") to Host structs.
     pub static ref HOSTS: HashMap<&'static str, Arc<Host>> = hashmap!{
         "gh" => Arc::new(GitHub::new()) as Arc<Host>,
