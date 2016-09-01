@@ -40,6 +40,9 @@ pub struct Options {
     pub command: Option<Command>,
     /// URI to the gist to operate on, if any.
     pub gist: Option<gist::Uri>,
+    /// Arguments to the gist, if any.
+    /// This is only used if command == Some(Command::Run).
+    pub gist_args: Option<Vec<String>>,
 }
 
 impl Options {
@@ -63,10 +66,19 @@ impl<'a> From<ArgMatches<'a>> for Options {
             // and failed gist URI parsing should return Err)
             .map(|g| gist::Uri::from_str(g).unwrap());
 
+        // For the "run" command, arguments may be provided.
+        let mut gist_args = submatches
+            .and_then(|m| m.values_of(ARG_GIST_ARGV))
+            .map(|argv| argv.map(|v| v.to_owned()).collect());
+        if command == Some(Command::Run) && gist_args.is_none() {
+            gist_args = Some(vec![]);
+        }
+
         Options{
             verbosity: verbose_count - quiet_count,
             command: command,
             gist: gist,
+            gist_args: gist_args,
         }
     }
 }
@@ -130,6 +142,7 @@ const APP_NAME: &'static str = "gisht";
 const APP_DESC: &'static str = "Gists in the shell";
 
 const ARG_GIST: &'static str = "gist";
+const ARG_GIST_ARGV: &'static str = "argv";
 const OPT_VERBOSE: &'static str = "verbose";
 const OPT_QUIET: &'static str = "quiet";
 
@@ -144,6 +157,8 @@ fn create_parser<'p>() -> Parser<'p> {
         .about(APP_DESC)
 
         .setting(AppSettings::ArgRequiredElseHelp)
+        .setting(AppSettings::SubcommandRequiredElseHelp)
+        .setting(AppSettings::VersionlessSubcommands)
         .setting(AppSettings::UnifiedHelpMessage)
         .setting(AppSettings::DeriveDisplayOrder)
 
@@ -163,7 +178,16 @@ fn create_parser<'p>() -> Parser<'p> {
 
         .subcommand(SubCommand::with_name(Command::Run.name())
             .about("Run the specified gist")
-            .arg(gist_arg("Gist to run")))
+            .arg(gist_arg("Gist to run"))
+            // This argument spec is capturing everything after the gist URI,
+            // allowing for the arguments to be passed to the gist itself.
+            .arg(Arg::with_name(ARG_GIST_ARGV)
+                .required(false)
+                .multiple(true)
+                .use_delimiter(false)
+                .help("Optional arguments passed to the gist")
+                .value_name("ARGS"))
+            .setting(AppSettings::TrailingVarArg))
         .subcommand(SubCommand::with_name(Command::Which.name())
             .about("Output the path to gist's binary")
             .arg(gist_arg("Gist to locate")))

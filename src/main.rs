@@ -107,7 +107,7 @@ fn main() {
         }
 
         match cmd {
-            args::Command::Run => run_gist(&gist),
+            args::Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
             args::Command::Which => print_binary_path(&gist),
             _ => unimplemented!(),
         }
@@ -140,10 +140,11 @@ fn display_warning() {
 
 /// Run the specified gist.
 /// Regardless whether or not it succceeds, this function does not return.
-// TODO: accept arguments
-fn run_gist(gist: &Gist) -> ! {
+fn run_gist(gist: &Gist, args: &[String]) -> ! {
     let uri = gist.uri.clone();
+
     let mut command = Command::new(gist.binary_path());
+    command.args(args);
 
     // On Unix, we can replace the app's process completely with gist's executable
     // but on Windows, we have to run it as a child process and wait for it.
