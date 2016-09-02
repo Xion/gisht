@@ -7,8 +7,7 @@ use std::str::FromStr;
 
 use regex::Regex;
 
-use super::hosts::{DEFAULT_HOST_ID, HOSTS};
-use super::Host;
+use hosts::{Host, DEFAULT_HOST_ID, HOSTS};
 
 
 /// Gist URI: custom universal resource identifier of a single gist.

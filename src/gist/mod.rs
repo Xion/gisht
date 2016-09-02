@@ -1,13 +1,14 @@
 //! Module implementing the handling of gists.
+//!
+//! Gists are represented as the Gist structure, with the auxiliary URI
+//! that helps refering to them as command line arguments to the program.
 
-mod hosts;
 mod uri;
 
 
 use std::path::PathBuf;
 
 use super::{BIN_DIR, GISTS_DIR};
-pub use self::hosts::Host;
 pub use self::uri::Uri;
 
 

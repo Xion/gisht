@@ -1,4 +1,7 @@
 //! Module implementing GitHub as gist host.
+//!
+//! This is specifically about the gist.github.com part of GitHub,
+//! NOT the actual GitHub repository hosting.
 
 use std::fs;
 use std::io::{self, Read};
@@ -10,10 +13,11 @@ use hyper::header::{ContentLength, UserAgent};
 use rustc_serialize::json::Json;
 use url::Url;
 
+use super::super::USER_AGENT;
 use ext::hyper::header::Link;
 use gist::{self, Gist};
 use util::{mark_executable, symlink_file};
-use super::USER_AGENT;
+use super::Host;
 
 
 #[derive(Debug)]
@@ -27,7 +31,7 @@ impl GitHub {
     }
 }
 
-impl gist::Host for GitHub {
+impl Host for GitHub {
     fn name(&self) -> &str { "GitHub" }
 
     /// Get all GitHub gists belonging to given owner.

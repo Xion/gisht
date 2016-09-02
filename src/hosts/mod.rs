@@ -1,11 +1,17 @@
 //! Module defining gist hosts.
+//!
+//! A host is an external (web) service that hosts gists, and allows users to paste snippets
+//! of code to share with others. gist.github.com is a prime example; others are the various
+//! "pastebins", including the pastebin.com namesake.
+
+mod github;
+
 
 use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
 
-use github::GitHub;
-use super::Gist;
+use super::gist::Gist;
 
 
 /// Represents a gists' host: a (web) service that hosts gists (code snippets).
@@ -31,7 +37,7 @@ pub trait Host : Send + Sync {
 lazy_static! {
     /// Mapping of gist host identifiers (like "gh") to Host structs.
     pub static ref HOSTS: HashMap<&'static str, Arc<Host>> = hashmap!{
-        "gh" => Arc::new(GitHub::new()) as Arc<Host>,
+        "gh" => Arc::new(github::GitHub::new()) as Arc<Host>,
     };
 }
 

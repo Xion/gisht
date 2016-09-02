@@ -21,7 +21,7 @@
 mod args;
 mod ext;
 mod gist;
-mod github;
+mod hosts;
 mod logging;
 mod util;
 
