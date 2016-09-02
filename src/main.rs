@@ -6,6 +6,7 @@
              extern crate conv;
 #[macro_use] extern crate custom_derive;
 #[macro_use] extern crate enum_derive;
+#[macro_use] extern crate error_derive;
              extern crate fern;
              extern crate git2;
              extern crate hyper;
@@ -68,7 +69,9 @@ lazy_static! {
 
 
 fn main() {
-    let opts = args::parse();
+    let opts = args::parse()
+        .unwrap_or_else(|e| panic!("Failed to parse argv; {}", e));
+
     logging::init(opts.verbose()).unwrap();
 
     // If this is a first run and it's interactive,
@@ -135,9 +138,11 @@ fn display_warning() {
 /// Regardless whether or not it succceeds, this function does not return.
 fn run_gist(gist: &Gist, args: &[String]) -> ! {
     let uri = gist.uri.clone();
+    debug!("Running gist {}...", uri);
 
     let mut command = Command::new(gist.binary_path());
     command.args(args);
+    trace!("About to execute {:?}", command);
 
     // On Unix, we can replace the app's process completely with gist's executable
     // but on Windows, we have to run it as a child process and wait for it.
@@ -148,6 +153,8 @@ fn run_gist(gist: &Gist, args: &[String]) -> ! {
         // The process isn't really usable afterwards, so we just panic.
         let error = command.exec();
         panic!("Failed to execute gist {}: {}", uri, error);
+        // TODO: if the gist doesn't have a proper hashbang, try to deduce the proper interpreter
+        // based on the file extension instead
     } else {
         let mut run = command.spawn()
             .unwrap_or_else(|e| panic!("Failed to execute gist {}: {}", uri, e));

@@ -4,6 +4,7 @@
 //! NOT the actual GitHub repository hosting.
 
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::fs;
 use std::io::{self, Read};
 use std::marker::PhantomData;
@@ -150,7 +151,7 @@ fn list_gists(owner: &str) -> Vec<Gist> {
         url.into_string()
     };
 
-    let mut result = Vec::new();
+    let mut result = HashSet::new();
     loop {
         debug!("Listing GitHub gists from {}", gists_url);
         let mut resp = http.get(&gists_url)
@@ -160,14 +161,12 @@ fn list_gists(owner: &str) -> Vec<Gist> {
         // Parse the response as JSON array and extract gist names from it.
         let gists_json = read_json(&mut resp);
         if let Json::Array(gists) = gists_json {
-            debug!("{} gist(s) found", gists.len());
+            trace!("Result page with {} gist(s) found", gists.len());
             for gist in gists {
                 let id = gist["id"].as_string().unwrap();
 
                 // GitHub names gists after first files in alphabetical order,
                 // so we need to find that first file.
-                // TODO: warn the user when this could create ambiguity,
-                // with two gists named the same way according to this scheme
                 let mut gist_files: Vec<_> = gist["files"].as_object().unwrap()
                     .keys().collect();
                 if gist_files.is_empty() {
@@ -179,7 +178,10 @@ fn list_gists(owner: &str) -> Vec<Gist> {
 
                 let gist_uri = gist::Uri::new("gh", owner, gist_name).unwrap();
                 trace!("GitHub gist found ({}) with id={}", gist_uri, id);
-                result.push(Gist::new(gist_uri, id));
+                if !result.insert(Gist::new(gist_uri, id)) {
+                    // TODO: find a way to warn the user about this ambiguity
+                    warn!("GitHub gist {}/{} is a duplicate, skipping.", owner, gist_name);
+                }
             }
         }
 
@@ -190,9 +192,11 @@ fn list_gists(owner: &str) -> Vec<Gist> {
                 continue;
             }
         }
+
+        debug!("{} gist(s) found in total", result.len());
         break;
     }
-    result
+    result.into_iter().collect()
 }
 
 

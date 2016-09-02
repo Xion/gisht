@@ -6,6 +6,7 @@ use std::iter::IntoIterator;
 use std::str::FromStr;
 
 use clap::{self, AppSettings, Arg, ArgMatches, ArgSettings, SubCommand};
+use conv::TryFrom;
 use conv::errors::Unrepresentable;
 
 use super::gist;
@@ -13,18 +14,18 @@ use super::gist;
 
 /// Parse command line arguments and return matches' object.
 #[inline]
-pub fn parse() -> Options {
+pub fn parse() -> Result<Options, ArgsError> {
     parse_from_argv(env::args_os())
 }
 
 /// Parse application options from given array of arguments
 /// (*all* arguments, including binary name).
 #[inline]
-pub fn parse_from_argv<I, T>(argv: I) -> Options
+pub fn parse_from_argv<I, T>(argv: I) -> Result<Options, ArgsError>
     where I: IntoIterator<Item=T>, T: Into<OsString>
 {
     let matches = create_parser().get_matches_from(argv);
-    Options::from(matches)
+    Options::try_from(matches)
 }
 
 
@@ -52,19 +53,20 @@ impl Options {
     pub fn quiet(&self) -> bool { self.verbosity < 0 }
 }
 
-impl<'a> From<ArgMatches<'a>> for Options {
-    fn from(matches: ArgMatches<'a>) -> Self {
+impl<'a> TryFrom<ArgMatches<'a>> for Options {
+    type Err = ArgsError;
+
+    fn try_from(matches: ArgMatches<'a>) -> Result<Self, Self::Err> {
         let verbose_count = matches.occurrences_of(OPT_VERBOSE) as isize;
         let quiet_count = matches.occurrences_of(OPT_QUIET) as isize;
 
         // Command may be optionally provided, alongside the gist argument.
         let (subcmd, submatches) = matches.subcommand();
         let command = Command::from_str(subcmd).ok();
-        let gist = submatches
-            .and_then(|m| m.value_of(ARG_GIST))
-            // TODO: fix error handling here (it should be TryFrom,
-            // and failed gist URI parsing should return Err)
-            .map(|g| gist::Uri::from_str(g).unwrap());
+        let gist = match submatches.and_then(|m| m.value_of(ARG_GIST)) {
+            Some(g) => Some(try!(gist::Uri::from_str(g))),
+            _ => None,
+        };
 
         // For the "run" command, arguments may be provided.
         let mut gist_args = submatches
@@ -74,12 +76,22 @@ impl<'a> From<ArgMatches<'a>> for Options {
             gist_args = Some(vec![]);
         }
 
-        Options{
+        Ok(Options{
             verbosity: verbose_count - quiet_count,
             command: command,
             gist: gist,
             gist_args: gist_args,
-        }
+        })
+    }
+}
+
+custom_derive! {
+    /// Error that can occur while parsing of command line arguments.
+    #[derive(Debug, Clone, PartialEq,
+             Error("command line arguments error"), ErrorDisplay, ErrorFrom)]
+    pub enum ArgsError {
+        /// Error while parsing the gist URI.
+        Gist(gist::UriError),
     }
 }
 

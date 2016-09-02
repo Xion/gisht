@@ -18,7 +18,7 @@ use hosts::{Host, DEFAULT_HOST_ID, HOSTS};
 /// where the host_id part can be omitted to assume the default,
 /// and owner can be passed on as well if the name itself is identifier enough
 /// (this is usually host-specific).
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Uri {
     pub host_id: String,
     pub owner: String,
@@ -115,7 +115,7 @@ impl fmt::Debug for Uri {
 
 
 /// An error that occurred when creating a gist URI object.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum UriError {
     /// The URI was completely malformed (didn't match the pattern).
     /// Argument is the entire alleged URI string.

@@ -9,6 +9,7 @@ clap = { version = "2.2.4", features = ["suggestions"] }
 conv = "0.3"
 custom_derive = "*"
 enum_derive = "*"
+error_derive = "*"
 fern = "0.3"
 git2 = "0.4.4"
 hyper = { version = "0.9" }

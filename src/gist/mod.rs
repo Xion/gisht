@@ -9,12 +9,12 @@ mod uri;
 use std::path::PathBuf;
 
 use super::{BIN_DIR, GISTS_DIR};
-pub use self::uri::Uri;
+pub use self::uri::{Uri, UriError};
 
 
 
 /// Structure representing a single gist.
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone, Eq, Hash)]
 pub struct Gist {
     /// URI to the gist.
     pub uri: Uri,
