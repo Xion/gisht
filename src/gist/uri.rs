@@ -94,14 +94,22 @@ impl Into<PathBuf> for Uri {
 
 impl fmt::Display for Uri {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{}:{}/{}", self.host_id, self.owner, self.name)
+        if self.has_owner() {
+            write!(fmt, "{}:{}/{}", self.host_id, self.owner, self.name)
+        } else {
+            write!(fmt, "{}:{}", self.host_id, self.name)
+        }
     }
 }
 
 impl fmt::Debug for Uri {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "Uri{{\"{}\", owner={}, name={}}}",
-            self.host_id, self.owner, self.name)
+        if self.has_owner() {
+            write!(fmt, "Uri{{\"{}\", owner={}, name={}}}",
+                self.host_id, self.owner, self.name)
+        } else {
+            write!(fmt, "Uri{{\"{}\", name={}}}", self.host_id, self.name)
+        }
     }
 }
 
