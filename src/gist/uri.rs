@@ -68,9 +68,14 @@ impl FromStr for Uri {
         }
         let parsed = try!(RE.captures(s)
             .ok_or_else(|| UriError::Malformed(s.to_owned())));
-        Uri::new(parsed.name("host").unwrap_or(DEFAULT_HOST_ID),
-                 parsed.name("owner").unwrap_or(""),
-                 parsed.name("name").unwrap())
+
+        let host_id = parsed.name("host").unwrap_or(DEFAULT_HOST_ID);
+        let opt_owner = parsed.name("owner");
+        let name = parsed.name("name").unwrap();
+        match opt_owner {
+            Some(owner) => Uri::new(host_id, owner, name),
+            None => Uri::from_name(host_id, name),
+        }
     }
 }
 
