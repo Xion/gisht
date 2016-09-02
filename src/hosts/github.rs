@@ -3,6 +3,7 @@
 //! This is specifically about the gist.github.com part of GitHub,
 //! NOT the actual GitHub repository hosting.
 
+use std::borrow::Cow;
 use std::fs;
 use std::io::{self, Read};
 use std::marker::PhantomData;
@@ -48,12 +49,20 @@ impl Host for GitHub {
             return Err(io::Error::new(io::ErrorKind::InvalidData, format!(
                 "expected a GitHub Gist, but got a '{}' one", gist.uri.host_id)));
         }
-        if !gist.id.is_some() {
-            return Err(io::Error::new(io::ErrorKind::InvalidData,
-                "GitHub Gist object must contain the gist ID to be downloaded"));
-        }
 
-        // TODO: if the gist's repo already exists, simply perform a git pull
+        // If the gist doesn't have the ID associated with it,
+        // resolve the owner/name by listing all the owner's gists.
+        let mut gist = Cow::Borrowed(gist);
+        if !gist.id.is_some() {
+            // TODO: if the gist is local, obtain the ID by simply resolving
+            // the Gist::binary_path symlink target
+            let gists = list_gists(&gist.uri.owner);
+            gist = match gists.into_iter().find(|g| gist.uri == g.uri) {
+                Some(gist) => Cow::Owned(gist),
+                _ => return Err(io::Error::new(
+                    io::ErrorKind::InvalidData, format!("Gist {} not found", gist.uri))),
+            };
+        }
 
         // Talk to GitHub to obtain the URL that we can clone the gist from
         // as a Git repository.
@@ -80,6 +89,7 @@ impl Host for GitHub {
         };
 
         // Create the gist's directory and clone it as a Git repo there.
+        // TODO: if the gist's repo already exists, simply perform a git pull
         let path = gist.path();
         try!(fs::create_dir_all(&path));
         try!(Repository::clone(&clone_url, &path)

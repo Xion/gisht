@@ -32,6 +32,12 @@ impl Gist {
     pub fn from_uri(uri: Uri) -> Self {
         Gist{uri: uri, id: None}
     }
+
+    /// Create the copy of Gist that has given ID attached.
+    #[inline]
+    pub fn with_id(self, id: String) -> Self {
+        Gist{id: Some(id), ..self}
+    }
 }
 
 impl Gist {

@@ -88,19 +88,9 @@ fn main() {
         let gist_uri = opts.gist.unwrap();
         debug!("Gist {} specified as the argument", gist_uri);
 
-        let mut gist = Gist::from_uri(gist_uri.clone());
+        let gist = Gist::from_uri(gist_uri.clone());
         if !gist.is_local() {
-            // TODO: this part is evidently GitHub-specific;
-            // GitHub::download_gist should probably try to resolve gist URI
-            // to obtain ID based on target binary of gist's symlink
-            // (and if the gist isn't local then do the gist iteration thingie)
-            let host = gist_uri.host();
-            let gists = host.gists(&gist_uri.owner);
-            gist = match gists.into_iter().find(|g| gist_uri == g.uri) {
-                Some(gist) => gist,
-                _ => { error!("Gist {} not found", gist_uri); exit(2); },
-            };
-            if let Err(err) = host.download_gist(&gist) {
+            if let Err(err) = gist_uri.host().download_gist(&gist) {
                 error!("Failed to download gist {}: {}", gist.uri, err);
                 exit(2);
             }
