@@ -7,6 +7,7 @@ use std::borrow::Cow;
 use std::fs;
 use std::io::{self, Read};
 use std::marker::PhantomData;
+use std::path::Path;
 
 use git2::Repository;
 use hyper::client::{Client, Response};
@@ -51,17 +52,23 @@ impl Host for GitHub {
         }
 
         // If the gist doesn't have the ID associated with it,
-        // resolve the owner/name by listing all the owner's gists.
+        // resolve the owner/name by either checking the already existing,
+        // local gist, or listing all the owner's gists to find the matching ID.
         let mut gist = Cow::Borrowed(gist);
         if !gist.id.is_some() {
-            // TODO: if the gist is local, obtain the ID by simply resolving
-            // the Gist::binary_path symlink target
-            let gists = list_gists(&gist.uri.owner);
-            gist = match gists.into_iter().find(|g| gist.uri == g.uri) {
-                Some(gist) => Cow::Owned(gist),
-                _ => return Err(io::Error::new(
-                    io::ErrorKind::InvalidData, format!("Gist {} not found", gist.uri))),
-            };
+            // TODO: if the gist's repo already exists, simply perform a git pull
+            // instead polling for gist info and cloning the repo
+            gist = if gist.is_local() {
+                let id = try!(id_from_binary_path(gist.binary_path()));
+                Cow::Owned(gist.into_owned().with_id(id))
+            } else {
+                let gists = list_gists(&gist.uri.owner);
+                match gists.into_iter().find(|g| gist.uri == g.uri) {
+                    Some(gist) => Cow::Owned(gist),
+                    _ => return Err(io::Error::new(
+                        io::ErrorKind::InvalidData, format!("Gist {} not found", gist.uri))),
+                }
+            }
         }
 
         // Talk to GitHub to obtain the URL that we can clone the gist from
@@ -89,7 +96,6 @@ impl Host for GitHub {
         };
 
         // Create the gist's directory and clone it as a Git repo there.
-        // TODO: if the gist's repo already exists, simply perform a git pull
         let path = gist.path();
         try!(fs::create_dir_all(&path));
         try!(Repository::clone(&clone_url, &path)
@@ -110,12 +116,27 @@ impl Host for GitHub {
     }
 }
 
-const GIST_BASE_URL: &'static str = "http://gist.github.com";
+/// Base URL to gist HTML pages.
+const HTML_URL: &'static str = "http://gist.github.com";
 
+/// Base URL for GitHub API requests.
 const API_URL: &'static str = "https://api.github.com";
 /// Size of the GitHub response page in items (e.g. gists).
 const RESPONSE_PAGE_SIZE: usize = 50;
 
+
+/// Obtain the gist ID from its binary path.
+fn id_from_binary_path<P: AsRef<Path>>(path: P) -> io::Result<String> {
+    let path = try!(path.as_ref().canonicalize());
+
+    // Binaries of GitHub gists are expected to be in the form of:
+    // ~/gisht/gists/gh/$ID/$NAME. We want the $ID.
+    path.parent().and_then(|p| p.file_stem())
+        .and_then(|s| s.to_str()).map(String::from)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound,
+            format!("Invalid GitHub gist binary path: {}", path.display())))
+
+}
 
 /// Get all GitHub gists belonging to a given owner.
 fn list_gists(owner: &str) -> Vec<Gist> {
