@@ -6,8 +6,8 @@
              extern crate conv;
 #[macro_use] extern crate custom_derive;
 #[macro_use] extern crate enum_derive;
+             extern crate env_logger;
 #[macro_use] extern crate error_derive;
-             extern crate fern;
              extern crate git2;
              extern crate hyper;
              extern crate isatty;
