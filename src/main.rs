@@ -68,11 +68,10 @@ lazy_static! {
 
 fn main() {
     let opts = args::parse().unwrap_or_else(|e| {
-        error!("Failed to parse argv; {}", e);
+        writeln!(&mut io::stderr(), "Failed to parse argv; {}", e).unwrap();
         exit(exitcode::EX_USAGE);
     });
-
-    logging::init(opts.verbose()).unwrap();
+    logging::init(opts.verbosity).unwrap();
 
     // If this is a first run and it's interactive,
     // display a warning about executing untrusted code.
