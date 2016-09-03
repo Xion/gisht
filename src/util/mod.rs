@@ -54,3 +54,17 @@ pub fn mark_executable<P: AsRef<Path>>(path: P) -> io::Result<()> {
 
     Ok(())
 }
+
+
+// Module defining standard exit codes that are normally found in POSIX header files.
+pub mod exitcode {
+    /// Type of the exit codes.
+    /// This should be the same as the argument type of std::process::exit.
+    pub type ExitCode = i32;
+
+    pub const EX_OK: ExitCode = 0;
+    pub const EX_USAGE: ExitCode = 64;
+    pub const EX_OSFILE: ExitCode = 72;
+    pub const EX_IOERR: ExitCode = 74;
+    pub const EX_TEMPFAIL: ExitCode = 75;
+}

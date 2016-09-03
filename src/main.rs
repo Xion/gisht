@@ -34,6 +34,7 @@ use std::path::PathBuf;
 use std::process::{Command, exit};
 
 use gist::Gist;
+use util::exitcode;
 
 
 lazy_static! {
@@ -48,11 +49,8 @@ lazy_static! {
 
 lazy_static! {
     /// Main application's directory.
-    static ref APP_DIR: PathBuf = {
-        let mut dir = env::home_dir().unwrap_or_else(|| env::temp_dir());
-        dir.push(".gisht");
-        dir
-    };
+    static ref APP_DIR: PathBuf =
+        env::home_dir().unwrap_or_else(|| env::temp_dir()).join(".gisht");
 
     /// Directory where gist sources are stored.
     ///
@@ -69,8 +67,10 @@ lazy_static! {
 
 
 fn main() {
-    let opts = args::parse()
-        .unwrap_or_else(|e| panic!("Failed to parse argv; {}", e));
+    let opts = args::parse().unwrap_or_else(|e| {
+        error!("Failed to parse argv; {}", e);
+        exit(exitcode::EX_USAGE);
+    });
 
     logging::init(opts.verbose()).unwrap();
 
@@ -82,7 +82,7 @@ fn main() {
             if let Err(err) = fs::create_dir_all(&*APP_DIR) {
                 error!("Failed to create application directory ({}): {}",
                     APP_DIR.display(), err);
-                exit(1);
+                exit(exitcode::EX_OSFILE);
             }
         }
     }
@@ -95,7 +95,7 @@ fn main() {
         if !gist.is_local() {
             if let Err(err) = gist_uri.host().download_gist(&gist) {
                 error!("Failed to download gist {}: {}", gist.uri, err);
-                exit(2);
+                exit(exitcode::EX_IOERR);
             }
         }
 
@@ -142,7 +142,9 @@ fn run_gist(gist: &Gist, args: &[String]) -> ! {
 
     let mut command = Command::new(gist.binary_path());
     command.args(args);
+
     trace!("About to execute {:?}", command);
+    log::shutdown_logger().unwrap();
 
     // On Unix, we can replace the app's process completely with gist's executable
     // but on Windows, we have to run it as a child process and wait for it.
@@ -159,10 +161,10 @@ fn run_gist(gist: &Gist, args: &[String]) -> ! {
         let mut run = command.spawn()
             .unwrap_or_else(|e| panic!("Failed to execute gist {}: {}", uri, e));
 
-        // Propagate thes same exit code that the gist binary returned.
+        // Propagate the same exit code that the gist binary returned.
         let exit_status = run.wait()
             .unwrap_or_else(|e| panic!("Failed to obtain status code for gist {}: {}", uri, e));
-        let exit_code = exit_status.code().unwrap_or(127);
+        let exit_code = exit_status.code().unwrap_or(exitcode::EX_TEMPFAIL);
         exit(exit_code);
     }
 }
@@ -171,7 +173,7 @@ fn run_gist(gist: &Gist, args: &[String]) -> ! {
 fn print_binary_path(gist: &Gist) -> ! {
     trace!("Printing binary path of {:?}", gist);
     println!("{}", gist.binary_path().display());
-    exit(0);
+    exit(exitcode::EX_OK);
 }
 
 /// Print the source of the gist's binary.
@@ -184,5 +186,5 @@ fn print_gist(gist: &Gist) -> ! {
             .unwrap_or_else(|e| panic!("Falled to read to the binary of gist {}: {}", gist.uri, e));
         io::stdout().write_all(&[byte]).unwrap();
     }
-    exit(0);
+    exit(exitcode::EX_OK);
 }
