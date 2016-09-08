@@ -37,11 +37,6 @@ impl GitHub {
 impl Host for GitHub {
     fn name(&self) -> &str { "GitHub" }
 
-    /// Get all GitHub gists belonging to given owner.
-    fn gists(&self, owner: &str) -> Vec<Gist> {
-        list_gists(owner)
-    }
-
     /// Download the GitHub gist's repo & create the appropriate binary symlink.
     ///
     /// If the gist hasn't been downloaded already, a clone of the gist's Git repo is performed.

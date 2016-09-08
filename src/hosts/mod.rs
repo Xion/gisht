@@ -20,11 +20,6 @@ pub trait Host : Send + Sync {
     // Returns a user-visible name of the gists' host.
     fn name(&self) -> &str;
 
-    /// List all the gists of given owner.
-    // TODO: change this to  fn iter_gists(...) -> impl Iterator<Item=Gist>
-    // when it's supported in stable Rust
-    fn gists(&self, owner: &str) -> Vec<Gist>;
-
     /// Download a current version of the gist.
     ///
     /// If the gist has been downloaded previously,
