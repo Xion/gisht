@@ -22,9 +22,36 @@ pub fn parse() -> Result<Options, ArgsError> {
 /// (*all* arguments, including binary name).
 #[inline]
 pub fn parse_from_argv<I, T>(argv: I) -> Result<Options, ArgsError>
-    where I: IntoIterator<Item=T>, T: Into<OsString>
+    where I: IntoIterator<Item=T>, T: Clone + Into<OsString>
 {
-    let matches = create_parser().get_matches_from(argv);
+    let argv: Vec<_> = argv.into_iter().collect();
+
+    // We allow `gisht JohnDoe/foo` to be an alias of `gisht run JohnDoe/foo`.
+    // To support this, some preprocessing on the arguments has to be done
+    // in order to pick the parser with or without subcommands.
+    let parser = {
+        // Determine whether the first non-flag argument is one of the gist commands.
+        let first_arg = argv.iter().skip(1)
+            .map(|arg| {
+                let arg: OsString = arg.clone().into();
+                arg.into_string().unwrap_or_else(|_| String::new())
+            })
+            .find(|arg| !arg.starts_with("-"))
+            .unwrap_or_else(|| String::new());
+
+        // If it is, use the full argument parser which recognizes those commands.
+        match Command::from_str(&first_arg) {
+            Ok(_) => create_full_parser(),
+            Err(_) => {
+                // If it's not, the parser will already have "run" command baked in.
+                let mut parser = create_parser_base();
+                parser = configure_run_gist_parser(parser);
+                parser
+            },
+        }
+    };
+
+    let matches = parser.get_matches_from(argv);
     Options::try_from(matches)
 }
 
@@ -37,10 +64,10 @@ pub struct Options {
     /// Corresponds to the number of times the -v flag has been passed.
     /// If -q has been used instead, this will be negative.
     pub verbosity: isize,
-    /// Gist command that's been issued, if any.
-    pub command: Option<Command>,
-    /// URI to the gist to operate on, if any.
-    pub gist: Option<gist::Uri>,
+    /// Gist command that's been issued.
+    pub command: Command,
+    /// URI to the gist to operate on.
+    pub gist: gist::Uri,
     /// Arguments to the gist, if any.
     /// This is only used if command == Some(Command::Run).
     pub gist_args: Option<Vec<String>>,
@@ -60,19 +87,22 @@ impl<'a> TryFrom<ArgMatches<'a>> for Options {
         let verbose_count = matches.occurrences_of(OPT_VERBOSE) as isize;
         let quiet_count = matches.occurrences_of(OPT_QUIET) as isize;
 
-        // Command may be optionally provided, alongside the gist argument.
-        let (subcmd, submatches) = matches.subcommand();
-        let command = Command::from_str(subcmd).ok();
-        let gist = match submatches.and_then(|m| m.value_of(ARG_GIST)) {
-            Some(g) => Some(try!(gist::Uri::from_str(g))),
-            _ => None,
-        };
+        // Command may be optionally provided.
+        // If it isn't, it means the "run"  default was used, and so all the arguments
+        // are arguments to `gisht run`.
+        let (cmd, cmd_matches) = matches.subcommand();
+        let cmd_matches = cmd_matches.unwrap_or(&matches);
+        let command = Command::from_str(cmd).unwrap_or(Command::Run);
+
+        // Parse out the gist URI argument.
+        let gist = try!(gist::Uri::from_str(
+            cmd_matches.value_of(ARG_GIST).unwrap()
+        ));
 
         // For the "run" command, arguments may be provided.
-        let mut gist_args = submatches
-            .and_then(|m| m.values_of(ARG_GIST_ARGV))
+        let mut gist_args = cmd_matches.values_of(ARG_GIST_ARGV)
             .map(|argv| argv.map(|v| v.to_owned()).collect());
-        if command == Some(Command::Run) && gist_args.is_none() {
+        if command == Command::Run && gist_args.is_none() {
             gist_args = Some(vec![]);
         }
 
@@ -159,8 +189,34 @@ const OPT_VERBOSE: &'static str = "verbose";
 const OPT_QUIET: &'static str = "quiet";
 
 
-/// Create the argument parser.
-fn create_parser<'p>() -> Parser<'p> {
+/// Create the full argument parser.
+/// This parser accepts the entire gamut of the application's arguments and flags.
+fn create_full_parser<'p>() -> Parser<'p> {
+    let parser = create_parser_base();
+
+    parser
+        .setting(AppSettings::SubcommandRequiredElseHelp)
+        .setting(AppSettings::VersionlessSubcommands)
+
+        .subcommand(configure_run_gist_parser(
+            SubCommand::with_name(Command::Run.name())
+                .about("Run the specified gist")))
+        .subcommand(SubCommand::with_name(Command::Which.name())
+            .about("Output the path to gist's binary")
+            .arg(gist_arg("Gist to locate")))
+        .subcommand(SubCommand::with_name(Command::Print.name())
+            .about("Print the source code of gist's binary")
+            .arg(gist_arg("Gist to print")))
+        .subcommand(SubCommand::with_name(Command::Open.name())
+            .about("Open the gist's webpage")
+            .arg(gist_arg("Gist to open")))
+}
+
+/// Create the "base" argument parser object.
+///
+/// This base contains all the shared configuration (like the application name)
+/// and the flags shared by all gist subcommands.
+fn create_parser_base<'p>() -> Parser<'p> {
     let mut parser = Parser::new(APP_NAME);
     if let Some(version) = option_env!("CARGO_PKG_VERSION") {
         parser = parser.version(version);
@@ -169,8 +225,6 @@ fn create_parser<'p>() -> Parser<'p> {
         .about(APP_DESC)
 
         .setting(AppSettings::ArgRequiredElseHelp)
-        .setting(AppSettings::SubcommandRequiredElseHelp)
-        .setting(AppSettings::VersionlessSubcommands)
         .setting(AppSettings::UnifiedHelpMessage)
         .setting(AppSettings::DeriveDisplayOrder)
 
@@ -187,28 +241,22 @@ fn create_parser<'p>() -> Parser<'p> {
             .help("Decrease logging verbosity"))
         .help_short("H")
         .version_short("V")
+}
 
-        .subcommand(SubCommand::with_name(Command::Run.name())
-            .about("Run the specified gist")
-            .arg(gist_arg("Gist to run"))
-            // This argument spec is capturing everything after the gist URI,
-            // allowing for the arguments to be passed to the gist itself.
-            .arg(Arg::with_name(ARG_GIST_ARGV)
-                .required(false)
-                .multiple(true)
-                .use_delimiter(false)
-                .help("Optional arguments passed to the gist")
-                .value_name("ARGS"))
-            .setting(AppSettings::TrailingVarArg))
-        .subcommand(SubCommand::with_name(Command::Which.name())
-            .about("Output the path to gist's binary")
-            .arg(gist_arg("Gist to locate")))
-        .subcommand(SubCommand::with_name(Command::Print.name())
-            .about("Print the source code of gist's binary")
-            .arg(gist_arg("Gist to print")))
-        .subcommand(SubCommand::with_name(Command::Open.name())
-            .about("Open the gist's webpage")
-            .arg(gist_arg("Gist to open")))
+/// Configure a parser for the "run" command.
+/// This is also used when there is no command given.
+fn configure_run_gist_parser<'p>(parser: Parser<'p>) -> Parser<'p> {
+    parser
+        .arg(gist_arg("Gist to run"))
+        // This argument spec is capturing everything after the gist URI,
+        // allowing for the arguments to be passed to the gist itself.
+        .arg(Arg::with_name(ARG_GIST_ARGV)
+            .required(false)
+            .multiple(true)
+            .use_delimiter(false)
+            .help("Optional arguments passed to the gist")
+            .value_name("ARGS"))
+        .setting(AppSettings::TrailingVarArg)
 }
 
 /// Create the GIST argument to various gist subcommands.

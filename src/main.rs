@@ -86,26 +86,20 @@ fn main() {
         }
     }
 
-    if let Some(cmd) = opts.command {
-        let gist_uri = opts.gist.unwrap();
-        debug!("Gist {} specified as the argument", gist_uri);
-
-        let gist = Gist::from_uri(gist_uri.clone());
-        if !gist.is_local() {
-            if let Err(err) = gist_uri.host().download_gist(&gist) {
-                error!("Failed to download gist {}: {}", gist.uri, err);
-                exit(exitcode::EX_IOERR);
-            }
+    debug!("Gist {} specified as the argument", opts.gist);
+    let gist = Gist::from_uri(opts.gist.clone());
+    if !gist.is_local() {
+        if let Err(err) = opts.gist.host().download_gist(&gist) {
+            error!("Failed to download gist {}: {}", gist.uri, err);
+            exit(exitcode::EX_IOERR);
         }
+    }
 
-        match cmd {
-            args::Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
-            args::Command::Which => print_binary_path(&gist),
-            args::Command::Print => print_gist(&gist),
-            _ => unimplemented!(),
-        }
-    } else {
-        debug!("No gist command specified -- exiting.");
+    match opts.command {
+        args::Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
+        args::Command::Which => print_binary_path(&gist),
+        args::Command::Print => print_gist(&gist),
+        _ => unimplemented!(),
     }
 }
 
