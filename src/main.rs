@@ -35,6 +35,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::exit;
 
+use args::{Command, Locality};
 use commands::{run_gist, print_binary_path, print_gist};
 use gist::Gist;
 use util::exitcode;
@@ -91,7 +92,18 @@ fn main() {
 
     debug!("Gist {} specified as the argument", opts.gist);
     let gist = Gist::from_uri(opts.gist.clone());
-    if !gist.is_local() {
+    if gist.is_local() {
+        if opts.locality == Some(Locality::Remote) {
+            // --fetch on exisiting gists is NYI
+            unimplemented!();
+            // TODO: perform a Git pull on exisiting gist repo;
+            // Host::download_gist can do that (after renaming it to Host::fetch_gist)
+        }
+    } else {
+        if opts.locality == Some(Locality::Local) {
+            error!("Gist {} is not available locally -- exiting.", opts.gist);
+            exit(exitcode::EX_NOINPUT);
+        }
         if let Err(err) = opts.gist.host().download_gist(&gist) {
             error!("Failed to download gist {}: {}", gist.uri, err);
             exit(exitcode::EX_IOERR);
@@ -99,9 +111,9 @@ fn main() {
     }
 
     match opts.command {
-        args::Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
-        args::Command::Which => print_binary_path(&gist),
-        args::Command::Print => print_gist(&gist),
+        Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
+        Command::Which => print_binary_path(&gist),
+        Command::Print => print_gist(&gist),
         _ => unimplemented!(),
     }
 }

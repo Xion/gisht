@@ -178,6 +178,8 @@ fn list_gists(owner: &str) -> Vec<Gist> {
                     warn!("GitHub gist {}/{} is a duplicate, skipping.", owner, gist_name);
                 }
             }
+        } else {
+            warn!("Invalid JSON format of GitHub gist result page ({})", gists_url);
         }
 
         // Determine the URL to get the next page of gists from.

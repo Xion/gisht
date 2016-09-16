@@ -64,6 +64,11 @@ pub struct Options {
     /// Corresponds to the number of times the -v flag has been passed.
     /// If -q has been used instead, this will be negative.
     pub verbosity: isize,
+    /// Gist locality flag.
+    ///
+    /// Depending on its value, this flag. may optionally
+    /// e.g. prohibit the app from downloading gists from remote hosts.
+    pub locality: Option<Locality>,
     /// Gist command that's been issued.
     pub command: Command,
     /// URI to the gist to operate on.
@@ -86,6 +91,15 @@ impl<'a> TryFrom<ArgMatches<'a>> for Options {
     fn try_from(matches: ArgMatches<'a>) -> Result<Self, Self::Err> {
         let verbose_count = matches.occurrences_of(OPT_VERBOSE) as isize;
         let quiet_count = matches.occurrences_of(OPT_QUIET) as isize;
+        let verbosity = verbose_count - quiet_count;
+
+        let locality = if matches.is_present(OPT_LOCAL) {
+            Some(Locality::Local)
+        } else if matches.is_present(OPT_REMOTE) {
+            Some(Locality::Remote)
+        } else {
+            None
+        };
 
         // Command may be optionally provided.
         // If it isn't, it means the "run"  default was used, and so all the arguments
@@ -107,7 +121,8 @@ impl<'a> TryFrom<ArgMatches<'a>> for Options {
         }
 
         Ok(Options{
-            verbosity: verbose_count - quiet_count,
+            verbosity: verbosity,
+            locality: locality,
             command: command,
             gist: gist,
             gist_args: gist_args,
@@ -122,6 +137,20 @@ custom_derive! {
     pub enum ArgsError {
         /// Error while parsing the gist URI.
         Gist(gist::UriError),
+    }
+}
+
+
+custom_derive! {
+    /// Enum describing gist "locality" options.
+    #[derive(Clone, Debug, Eq, PartialEq,
+             IterVariants(Localities))]
+    pub enum Locality {
+        /// Operate only on gists available locally
+        /// (do not fetch anything from remote gist hosts).
+        Local,
+        /// Always fetch the gists from a remote gist host.
+        Remote,
     }
 }
 
@@ -187,6 +216,8 @@ const ARG_GIST: &'static str = "gist";
 const ARG_GIST_ARGV: &'static str = "argv";
 const OPT_VERBOSE: &'static str = "verbose";
 const OPT_QUIET: &'static str = "quiet";
+const OPT_LOCAL: &'static str = "local";
+const OPT_REMOTE: &'static str = "remote";
 
 
 /// Create the full argument parser.
@@ -228,7 +259,7 @@ fn create_parser_base<'p>() -> Parser<'p> {
         .setting(AppSettings::UnifiedHelpMessage)
         .setting(AppSettings::DeriveDisplayOrder)
 
-        // Flags shared by all subcommands.
+        // Verbosity flags (shared by all subcommands).
         .arg(Arg::with_name(OPT_VERBOSE)
             .long("verbose").short("v")
             .set(ArgSettings::Multiple)
@@ -239,6 +270,17 @@ fn create_parser_base<'p>() -> Parser<'p> {
             .set(ArgSettings::Multiple)
             .conflicts_with(OPT_VERBOSE)
             .help("Decrease logging verbosity"))
+
+        // Gist locality flags (shared by all subcommands).
+        .arg(Arg::with_name(OPT_LOCAL)
+            .long("cached").short("c")
+            .conflicts_with(OPT_REMOTE)
+            .help("Operate only on gists available locally"))
+        .arg(Arg::with_name(OPT_REMOTE)
+            .long("fetch").short("f")
+            .conflicts_with(OPT_LOCAL)
+            .help("Always fetch the gist from a remote host"))
+
         .help_short("H")
         .version_short("V")
 }
