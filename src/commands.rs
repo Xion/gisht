@@ -1,10 +1,12 @@
 //! Module implementing various commands that can be performed on gists.
 
+use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
+use std::path::Path;
 use std::process::{Command, exit};
 
-use log;
+use shlex;
 
 use gist::Gist;
 use util::exitcode;
@@ -14,25 +16,37 @@ use util::exitcode;
 /// Regardless whether or not it succceeds, this function does not return.
 pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
     let uri = gist.uri.clone();
-    debug!("Running gist {}...", uri);
+    let binary = gist.binary_path();
+    debug!("Running gist {} ({})...", uri, binary.display());
 
-    let mut command = Command::new(gist.binary_path());
+    let mut command = Command::new(&binary);
     command.args(args);
 
     trace!("About to execute {:?}", command);
-    log::shutdown_logger().unwrap();
 
     // On Unix, we can replace the app's process completely with gist's executable
     // but on Windows, we have to run it as a child process and wait for it.
     if cfg!(unix) {
         use std::os::unix::process::CommandExt;
+        const ERR_EXEC_FORMAT: i32 = 8;
 
         // This calls execvp() and doesn't return unless an error occurred.
-        // The process isn't really usable afterwards, so we just panic.
-        let error = command.exec();
+        let mut error = command.exec();
+        debug!("Executing {:?} failed: {}", command, error);
+
+        // If the problem was the executable format, it may be a lack of proper hashbang.
+        // We'll try to infer a common interpreter based on gist's file extension
+        // and feed it to its interpreter manually.
+        if error.raw_os_error() == Some(ERR_EXEC_FORMAT) {
+            trace!("Invalid executable format of {}", binary.display());
+            warn!("Couldn't run gist {} directly; it may not have a proper hashbang.", uri);
+            if let Some(interpreter) = guess_interpreter(&binary) {
+                error = interpreted_run(interpreter, &binary, args);
+            } else {
+                error!("Failed to guess an interpereter for gist {}", uri);
+            }
+        }
         panic!("Failed to execute gist {}: {}", uri, error);
-        // TODO: if the gist doesn't have a proper hashbang, try to deduce the proper interpreter
-        // based on the file extension instead
     } else {
         let mut run = command.spawn()
             .unwrap_or_else(|e| panic!("Failed to execute gist {}: {}", uri, e));
@@ -44,6 +58,64 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
         let exit_code = exit_status.code().unwrap_or(exitcode::EX_TEMPFAIL);
         exit(exit_code);
     }
+}
+
+/// Guess an interpreter for given binary file based on its file extension.
+#[cfg(unix)]
+fn guess_interpreter<P: AsRef<Path>>(binary_path: P) -> Option<&'static str> {
+    let extension = match binary_path.as_ref().extension() {
+        Some(ext) => ext,
+        None => {
+            error!("Can't deduce interpreter w/o a binary file extension (got {})",
+                binary_path.as_ref().display());
+            return None;
+        },
+    };
+
+    extension.to_str()
+        .and_then(|ext| COMMON_INTERPRETERS.get(&ext).map(|i| *i))
+}
+
+/// Execute a script using given interpreter.
+/// The interpreter must be a "format string" containing placeholders
+/// for script path and arguments.
+#[cfg(unix)]
+fn interpreted_run<P: AsRef<Path>>(interpreter: &str,
+                                   script: P, args: &[String]) -> io::Error {
+    use std::os::unix::process::CommandExt;
+
+    // Format the interpreter-specific command line.
+    let args = args.iter().map(|a| shlex::quote(a)).collect::<Vec<_>>().join(" ");
+    let cmd = interpreter.to_owned()
+        .replace("${script}", &script.as_ref().to_string_lossy())
+        .replace("${args}", &args);
+
+    // Split the final interpreter-invoking command into "argv"
+    // that can be executed via Command/execvp().
+    let cmd_argv = shlex::split(&cmd).unwrap();
+    let mut command = Command::new(&cmd_argv[0]);
+    command.args(&cmd_argv[1..]);
+
+    // If everything goes well, this will not return.
+    let error = command.exec();
+    debug!("Interpreted run of {} failed: {}", script.as_ref().display(), error);
+    error
+}
+
+#[cfg(unix)]
+lazy_static! {
+    /// Mapping of common interpreters from file extensions they can handle.
+    ///
+    /// Interpreters are defined as shell commands with placeholders
+    /// for gist script name and its arguments.
+    static ref COMMON_INTERPRETERS: HashMap<&'static str, &'static str> = hashmap!{
+        "hs" => "runhaskell ${script} ${args}",
+        "js" => "node -e ${script} ${args}",
+        "pl" => "perl -- ${script} ${args}",
+        "py" => "python ${script} - ${args}",
+        "rb" => "irb -- ${script} ${args}",
+        "sh" => "sh -- ${script} ${args}",
+    };
 }
 
 
@@ -68,4 +140,39 @@ pub fn print_gist(gist: &Gist) -> ! {
         io::stdout().write_all(&[byte]).unwrap();
     }
     exit(exitcode::EX_OK);
+}
+
+
+#[cfg(test)]
+mod tests {
+    #[cfg(unix)]
+    mod unix {
+        use shlex;
+        use super::super::COMMON_INTERPRETERS;
+
+        #[test]
+        fn interpreter_command_placeholders() {
+            for cmd in COMMON_INTERPRETERS.values() {
+                assert!(cmd.contains("${script}"),
+                    "`{}` doesn't contain a script path placeholder", cmd);
+                assert!(cmd.contains("${args}"),
+                    "`{}` doesn't contain a script args placeholder", cmd);
+            }
+        }
+
+        #[test]
+        fn interpreter_command_syntax() {
+            for cmd in COMMON_INTERPRETERS.values() {
+                let final_cmd = cmd.to_owned()
+                    .replace("${script}", "foo")
+                    .replace("${args}", "bar \"baz thud\"");
+                let cmd_argv = shlex::split(&final_cmd);
+
+                assert!(cmd_argv.is_some(),
+                    "Formatted `{}` doesn't parse as a shell command", cmd);
+                assert!(cmd_argv.unwrap().len() >= 3,  // interpreter + script path + script args
+                    "Formatted `{}` is way too short to be valid", cmd);
+            }
+        }
+    }
 }
