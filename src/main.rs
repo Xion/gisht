@@ -79,7 +79,7 @@ fn main() {
 
     ensure_app_dir(&opts);
 
-    let gist = resolve_gist(&opts);
+    let gist = decode_gist(&opts);
     match opts.command {
         Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
         Command::Which => print_binary_path(&gist),
@@ -121,7 +121,7 @@ fn ensure_app_dir(opts: &Options) {
 
 /// Use command line arguments to obtain a Gist object.
 /// This may include fetching a fresh gist from a host, or updating it.
-fn resolve_gist(opts: &Options) -> Gist {
+fn decode_gist(opts: &Options) -> Gist {
     let uri = opts.gist_uri.clone();
     debug!("Gist {} specified as the argument", uri);
 

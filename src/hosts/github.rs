@@ -47,66 +47,11 @@ impl Host for GitHub {
                 "expected a GitHub Gist, but got a '{}' one", gist.uri.host_id)));
         }
 
-        // If the gist doesn't have the ID associated with it,
-        // resolve the owner/name by either checking the already existing,
-        // local gist, or listing all the owner's gists to find the matching ID.
-        let mut gist = Cow::Borrowed(gist);
-        if !gist.id.is_some() {
-            // TODO: if the gist's repo already exists, simply perform a git pull
-            // instead polling for gist info and cloning the repo
-            gist = if gist.is_local() {
-                let id = try!(id_from_binary_path(gist.binary_path()));
-                Cow::Owned(gist.into_owned().with_id(id))
-            } else {
-                let gists = list_gists(&gist.uri.owner);
-                match gists.into_iter().find(|g| gist.uri == g.uri) {
-                    Some(gist) => Cow::Owned(gist),
-                    _ => return Err(io::Error::new(
-                        io::ErrorKind::InvalidData, format!("Gist {} not found", gist.uri))),
-                }
-            }
-        }
+        let gist = try!(resolve_gist(gist));
 
-        // Talk to GitHub to obtain the URL that we can clone the gist from
-        // as a Git repository.
-        let clone_url = {
-            let http = Client::new();
-
-            let gist_url = {
-                let mut url = Url::parse(API_URL).unwrap();
-                url.set_path(&format!("gists/{}", gist.id.as_ref().unwrap()));
-                url.into_string()
-            };
-
-            debug!("Getting GitHub gist info from {}", gist_url);
-            let mut resp = try!(http.get(&gist_url)
-                .header(UserAgent(USER_AGENT.clone()))
-                .send()
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
-            let gist_info_json = read_json(&mut resp);
-
-            let clone_url = gist_info_json["git_pull_url"].as_string().unwrap().to_owned();
-            trace!("GitHub gist #{} has a git_pull_url=\"{}\"",
-                gist_info_json["id"].as_string().unwrap(), clone_url);
-            clone_url
-        };
-
-        // Create the gist's directory and clone it as a Git repo there.
-        let path = gist.path();
-        try!(fs::create_dir_all(&path));
-        try!(Repository::clone(&clone_url, &path)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
-
-        // Make sure the gist's executable is, in fact, executable.
-        let executable = gist.path().join(&gist.uri.name);
-        try!(mark_executable(&executable));
-
-        // Symlink the main/binary file to the binary directory.
-        let binary = gist.binary_path();
-        if !binary.exists() {
-            try!(fs::create_dir_all(binary.parent().unwrap()));
-            try!(symlink_file(&executable, &binary));
-        }
+        // TODO: if the gist's repo already exists, simply perform a git pull
+        // instead polling for gist info and cloning the repo
+       try!(clone_gist(gist));
 
         Ok(())
     }
@@ -115,11 +60,38 @@ impl Host for GitHub {
 /// Base URL to gist HTML pages.
 const HTML_URL: &'static str = "http://gist.github.com";
 
+
+// Fetching gists
+
 /// Base URL for GitHub API requests.
 const API_URL: &'static str = "https://api.github.com";
+
 /// Size of the GitHub response page in items (e.g. gists).
 const RESPONSE_PAGE_SIZE: usize = 50;
 
+
+/// Return a "resolved" Gist that has a GitHub ID associated with it.
+fn resolve_gist(gist: &Gist) -> io::Result<Cow<Gist>> {
+    let gist = Cow::Borrowed(gist);
+    if gist.id.is_some() {
+        return Ok(gist);
+    }
+
+    // If the gist doesn't have the ID associated with it,
+    // resolve the owner/name by either checking the already existing,
+    // local gist, or listing all the owner's gists to find the matching ID.
+    if gist.is_local() {
+        let id = try!(id_from_binary_path(gist.binary_path()));
+        Ok(Cow::Owned(gist.into_owned().with_id(id)))
+    } else {
+        let gists = list_gists(&gist.uri.owner);
+        match gists.into_iter().find(|g| gist.uri == g.uri) {
+            Some(gist) => Ok(Cow::Owned(gist)),
+            _ => return Err(io::Error::new(
+                io::ErrorKind::InvalidData, format!("Gist {} not found", gist.uri))),
+        }
+    }
+}
 
 /// Obtain the gist ID from its binary path.
 fn id_from_binary_path<P: AsRef<Path>>(path: P) -> io::Result<String> {
@@ -133,6 +105,59 @@ fn id_from_binary_path<P: AsRef<Path>>(path: P) -> io::Result<String> {
             format!("Invalid GitHub gist binary path: {}", path.display())))
 
 }
+
+
+/// Clone the gist's repo into the proper directory (which must NOT exist).
+/// Given Gist object must have the GitHub ID associated with it.
+fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
+    let gist = gist.as_ref();
+    assert!(gist.id.is_some(), "Gist {} has unknown GitHub ID!", gist.uri);
+    assert!(!gist.path().exists(), "Directory for gist {} already exists!", gist.uri);
+
+    // Talk to GitHub to obtain the URL that we can clone the gist from
+    // as a Git repository.
+    let clone_url = {
+        let http = Client::new();
+
+        let gist_url = {
+            let mut url = Url::parse(API_URL).unwrap();
+            url.set_path(&format!("gists/{}", gist.id.as_ref().unwrap()));
+            url.into_string()
+        };
+
+        debug!("Getting GitHub gist info from {}", gist_url);
+        let mut resp = try!(http.get(&gist_url)
+            .header(UserAgent(USER_AGENT.clone()))
+            .send()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
+        let gist_info_json = read_json(&mut resp);
+
+        let clone_url = gist_info_json["git_pull_url"].as_string().unwrap().to_owned();
+        trace!("GitHub gist #{} has a git_pull_url=\"{}\"",
+            gist_info_json["id"].as_string().unwrap(), clone_url);
+        clone_url
+    };
+
+    // Create the gist's directory and clone it as a Git repo there.
+    let path = gist.path();
+    try!(fs::create_dir_all(&path));
+    try!(Repository::clone(&clone_url, &path)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
+
+    // Make sure the gist's executable is, in fact, executable.
+    let executable = gist.path().join(&gist.uri.name);
+    try!(mark_executable(&executable));
+
+    // Symlink the main/binary file to the binary directory.
+    let binary = gist.binary_path();
+    if !binary.exists() {
+        try!(fs::create_dir_all(binary.parent().unwrap()));
+        try!(symlink_file(&executable, &binary));
+    }
+
+    Ok(())
+}
+
 
 /// Get all GitHub gists belonging to a given owner.
 fn list_gists(owner: &str) -> Vec<Gist> {
