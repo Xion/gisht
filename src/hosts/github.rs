@@ -10,7 +10,7 @@ use std::io::{self, Read};
 use std::marker::PhantomData;
 use std::path::Path;
 
-use git2::Repository;
+use git2::{self, Repository};
 use hyper::client::{Client, Response};
 use hyper::header::{ContentLength, UserAgent};
 use rustc_serialize::json::Json;
@@ -48,11 +48,11 @@ impl Host for GitHub {
         }
 
         let gist = try!(resolve_gist(gist));
-
-        // TODO: if the gist's repo already exists, simply perform a git pull
-        // instead polling for gist info and cloning the repo
-       try!(clone_gist(gist));
-
+        if gist.is_local() {
+            try!(update_gist(gist));
+        } else {
+            try!(clone_gist(gist));
+        }
         Ok(())
     }
 }
@@ -104,6 +104,37 @@ fn id_from_binary_path<P: AsRef<Path>>(path: P) -> io::Result<String> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound,
             format!("Invalid GitHub gist binary path: {}", path.display())))
 
+}
+
+
+/// Update an already-downloaded gist.
+/// Since GitHub gists are Git repositories, this is basically a `git pull`.
+fn update_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
+    let gist = gist.as_ref();
+    assert!(gist.id.is_some(), "Gist {} has unknown GitHub ID!", gist.uri);
+    assert!(gist.path().exists(), "Directory for gist {} doesn't exist!", gist.uri);
+
+    try!(git_pull(gist.path(), "origin", /* reflog_msg */ Some("gisht-update"))
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
+    // TODO: conficts?
+
+    Ok(())
+}
+
+/// Perform a standard Git "pull" operation.
+fn git_pull<P: AsRef<Path>>(repo_path: P,
+                            remote: &str,
+                            reflog_msg: Option<&str>) -> Result<(), git2::Error> {
+    // Since libgit2 is low-level, we have to perform the requisite steps manually,
+    // which means:
+    // * doing the fetch from origin remote
+    // * checking out the (new) HEAD
+    let repo = try!(Repository::open(repo_path));
+    let mut origin = try!(repo.find_remote(remote));
+    try!(origin.fetch(/* refspecs */ &[], /* options */ None, reflog_msg));
+    try!(repo.checkout_head(/* options */ None));
+
+    Ok(())
 }
 
 

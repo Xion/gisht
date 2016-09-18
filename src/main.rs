@@ -129,9 +129,10 @@ fn decode_gist(opts: &Options) -> Gist {
     if gist.is_local() {
         trace!("Gist {} found among already downloaded gists", gist.uri);
         if opts.locality == Some(Locality::Remote) {
-            // --fetch on exisiting gists is NYI
-            unimplemented!();
-            // TODO: perform a Git pull on exisiting gist repo; Host::fetch_gist can do that
+            if let Err(err) = gist.uri.host().fetch_gist(&gist) {
+                error!("Failed to update gist {}: {}", gist.uri, err);
+                exit(exitcode::EX_IOERR);
+            }
         }
     } else {
         if opts.locality == Some(Locality::Local) {
