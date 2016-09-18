@@ -35,7 +35,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::exit;
 
-use args::{Command, Locality};
+use args::{Command, Locality, Options};
 use commands::{run_gist, print_binary_path, print_gist};
 use gist::Gist;
 use util::exitcode;
@@ -77,21 +77,55 @@ fn main() {
     });
     logging::init(opts.verbosity).unwrap();
 
-    // If this is a first run and it's interactive,
-    // display a warning about executing untrusted code.
-    if !APP_DIR.exists() {
-        if isatty::stdout_isatty() && !opts.quiet() {
-            display_warning();
-            if let Err(err) = fs::create_dir_all(&*APP_DIR) {
-                error!("Failed to create application directory ({}): {}",
-                    APP_DIR.display(), err);
-                exit(exitcode::EX_OSFILE);
-            }
-        }
+    ensure_app_dir(&opts);
+
+    let gist = resolve_gist(&opts);
+    match opts.command {
+        Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
+        Command::Which => print_binary_path(&gist),
+        Command::Print => print_gist(&gist),
+        _ => unimplemented!(),
+    }
+}
+
+
+/// Ensure that application directory exists.
+/// If it needs to be created, this will be treated as application's first run.
+fn ensure_app_dir(opts: &Options) {
+    if APP_DIR.exists() {
+        trace!("Application directory ({}) already exists, skipping creation.",
+            APP_DIR.display());
+        return;
     }
 
-    debug!("Gist {} specified as the argument", opts.gist);
-    let gist = Gist::from_uri(opts.gist.clone());
+    // If the first run is interactive, display a warning about executing untrusted code.
+    if isatty::stdout_isatty() && !opts.quiet() {
+        trace!("Displaying warning about executing untrusted code..."):
+        let should_continue = display_warning();
+        if !should_continue {
+            debug!("Warning not acknowledged -- exiting.");
+            exit(2);
+        }
+    } else {
+        trace!("Quiet/non-interactive run, skipping untrusted code warning.");
+    }
+
+    trace!("Creating application directory ({})...", APP_DIR.display());
+    if let Err(err) = fs::create_dir_all(&*APP_DIR) {
+        error!("Failed to create application directory ({}): {}",
+            APP_DIR.display(), err);
+        exit(exitcode::EX_OSFILE);
+    }
+    debug!("Application directory ({}) created successfully.", APP_DIR.display());
+}
+
+/// Use command line arguments to obtain a Gist object.
+/// This may include fetching a fresh gist from a host, or updating it.
+fn resolve_gist(opts: &Options) -> Gist {
+    let uri = opts.gist_uri.clone();
+    debug!("Gist {} specified as the argument", uri);
+
+    let gist = Gist::from_uri(uri);
     if gist.is_local() {
         if opts.locality == Some(Locality::Remote) {
             // --fetch on exisiting gists is NYI
@@ -101,26 +135,22 @@ fn main() {
         }
     } else {
         if opts.locality == Some(Locality::Local) {
-            error!("Gist {} is not available locally -- exiting.", opts.gist);
+            error!("Gist {} is not available locally -- exiting.", gist.uri);
             exit(exitcode::EX_NOINPUT);
         }
-        if let Err(err) = opts.gist.host().download_gist(&gist) {
+        if let Err(err) = gist.uri.host().download_gist(&gist) {
             error!("Failed to download gist {}: {}", gist.uri, err);
             exit(exitcode::EX_IOERR);
         }
     }
 
-    match opts.command {
-        Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
-        Command::Which => print_binary_path(&gist),
-        Command::Print => print_gist(&gist),
-        _ => unimplemented!(),
-    }
+    gist
 }
 
+
 /// Display warning about executing untrusted code and ask the user to continue.
-/// If declined, the program will end.
-fn display_warning() {
+/// Returns whether the user decided to continue.
+fn display_warning() -> bool {
     const WARNING: &'static [&'static str] = &[
         "WARNING: gisht is used to download & run code from a remote source.",
         "",
@@ -136,7 +166,5 @@ fn display_warning() {
     let mut answer = String::with_capacity(1);
     io::stdin().read_line(&mut answer).unwrap();
 
-    if answer.trim().to_lowercase() != "y" {
-        exit(2);
-    }
+    answer.trim().to_lowercase() == "y"
 }

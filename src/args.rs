@@ -72,7 +72,7 @@ pub struct Options {
     /// Gist command that's been issued.
     pub command: Command,
     /// URI to the gist to operate on.
-    pub gist: gist::Uri,
+    pub gist_uri: gist::Uri,
     /// Arguments to the gist, if any.
     /// This is only used if command == Some(Command::Run).
     pub gist_args: Option<Vec<String>>,
@@ -109,7 +109,7 @@ impl<'a> TryFrom<ArgMatches<'a>> for Options {
         let command = Command::from_str(cmd).unwrap_or(Command::Run);
 
         // Parse out the gist URI argument.
-        let gist = try!(gist::Uri::from_str(
+        let gist_uri = try!(gist::Uri::from_str(
             cmd_matches.value_of(ARG_GIST).unwrap()
         ));
 
@@ -124,7 +124,7 @@ impl<'a> TryFrom<ArgMatches<'a>> for Options {
             verbosity: verbosity,
             locality: locality,
             command: command,
-            gist: gist,
+            gist_uri: gist_uri,
             gist_args: gist_args,
         })
     }
