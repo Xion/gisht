@@ -20,12 +20,12 @@ pub trait Host : Send + Sync {
     // Returns a user-visible name of the gists' host.
     fn name(&self) -> &str;
 
-    /// Download a current version of the gist.
+    /// Fetch a current version of the gist.
     ///
     /// If the gist has been downloaded previously,
     /// it may be updated instead (e.g. via pull rather than clone
     /// if its a Git repo).
-    fn download_gist(&self, gist: &Gist) -> io::Result<()>;
+    fn fetch_gist(&self, gist: &Gist) -> io::Result<()>;
 }
 
 

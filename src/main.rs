@@ -100,7 +100,7 @@ fn ensure_app_dir(opts: &Options) {
 
     // If the first run is interactive, display a warning about executing untrusted code.
     if isatty::stdout_isatty() && !opts.quiet() {
-        trace!("Displaying warning about executing untrusted code..."):
+        trace!("Displaying warning about executing untrusted code...");
         let should_continue = display_warning();
         if !should_continue {
             debug!("Warning not acknowledged -- exiting.");
@@ -127,18 +127,18 @@ fn resolve_gist(opts: &Options) -> Gist {
 
     let gist = Gist::from_uri(uri);
     if gist.is_local() {
+        trace!("Gist {} found among already downloaded gists", gist.uri);
         if opts.locality == Some(Locality::Remote) {
             // --fetch on exisiting gists is NYI
             unimplemented!();
-            // TODO: perform a Git pull on exisiting gist repo;
-            // Host::download_gist can do that (after renaming it to Host::fetch_gist)
+            // TODO: perform a Git pull on exisiting gist repo; Host::fetch_gist can do that
         }
     } else {
         if opts.locality == Some(Locality::Local) {
             error!("Gist {} is not available locally -- exiting.", gist.uri);
             exit(exitcode::EX_NOINPUT);
         }
-        if let Err(err) = gist.uri.host().download_gist(&gist) {
+        if let Err(err) = gist.uri.host().fetch_gist(&gist) {
             error!("Failed to download gist {}: {}", gist.uri, err);
             exit(exitcode::EX_IOERR);
         }

@@ -37,11 +37,11 @@ impl GitHub {
 impl Host for GitHub {
     fn name(&self) -> &str { "GitHub" }
 
-    /// Download the GitHub gist's repo & create the appropriate binary symlink.
+    /// Fetch the gist's repo from GitHub & create the appropriate binary symlink.
     ///
     /// If the gist hasn't been downloaded already, a clone of the gist's Git repo is performed.
     /// Otherwise, it's just a simple Git pull.
-    fn download_gist(&self, gist: &Gist) -> io::Result<()> {
+    fn fetch_gist(&self, gist: &Gist) -> io::Result<()> {
         if gist.uri.host_id != "gh" {
             return Err(io::Error::new(io::ErrorKind::InvalidData, format!(
                 "expected a GitHub Gist, but got a '{}' one", gist.uri.host_id)));
