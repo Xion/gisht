@@ -31,23 +31,29 @@ pub fn parse_from_argv<I, T>(argv: I) -> Result<Options, ArgsError>
     // in order to pick the parser with or without subcommands.
     let parser = {
         // Determine whether the first non-flag argument is one of the gist commands.
-        let first_arg = argv.iter().skip(1)
+        let maybe_first_arg = argv.iter().skip(1)
             .map(|arg| {
                 let arg: OsString = arg.clone().into();
                 arg.into_string().unwrap_or_else(|_| String::new())
             })
-            .find(|arg| !arg.starts_with("-"))
-            .unwrap_or_else(|| String::new());
+            .find(|arg| !arg.starts_with("-"));
 
-        // If it is, use the full argument parser which recognizes those commands.
-        match Command::from_str(&first_arg) {
-            Ok(_) => create_full_parser(),
-            Err(_) => {
-                // If it's not, the parser will already have "run" command baked in.
-                let mut parser = create_parser_base();
-                parser = configure_run_gist_parser(parser);
-                parser
-            },
+        // (That is, provided we got a positional argument at all).
+        if let Some(first_arg) = maybe_first_arg {
+            match Command::from_str(&first_arg) {
+                Ok(_) => create_full_parser(),
+                Err(_) => {
+                    // If it's not a gist command, the parser we'll use
+                    // will already have "run" command baked in.
+                    let mut parser = create_parser_base();
+                    parser = configure_run_gist_parser(parser);
+                    parser
+                },
+            }
+        } else {
+            // If we only got flag arguments, use the full parser (with subcommands).
+            // This ensure the correct help/usage instructions are shown.
+            create_full_parser()
         }
     };
 
