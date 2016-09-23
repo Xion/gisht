@@ -7,6 +7,7 @@ use std::path::Path;
 use std::process::{Command, exit};
 
 use shlex;
+use webbrowser;
 
 use gist::Gist;
 use util::exitcode;
@@ -140,6 +141,19 @@ pub fn print_gist(gist: &Gist) -> ! {
         io::stdout().write_all(&[byte]).unwrap();
     }
     exit(exitcode::EX_OK);
+}
+
+
+/// Open the gist's HTML page in the default system browser.
+pub fn open_gist(gist: &Gist) -> ! {
+    let url = gist.uri.host().gist_url(gist).unwrap_or_else(|e| {
+        panic!("Failed to determine the URL of gist {}: {}", gist.uri, e)
+    });
+    webbrowser::open(&url).unwrap_or_else(|e| {
+        panic!("Failed to open the URL of gist {} ({}) in the browser: {}",
+            gist.uri, url, e)
+    });
+    exit(exitcode::EX_OK)
 }
 
 

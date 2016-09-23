@@ -55,6 +55,16 @@ impl Host for GitHub {
         }
         Ok(())
     }
+
+    /// Return the URL to gist's HTML website.
+    fn gist_url(&self, gist: &Gist) -> io::Result<String> {
+        // TODO: get the URL from GitHub directly ('html_url' field of gist info)
+        // rather than formatting it manually
+        let gist = try!(resolve_gist(gist));
+        let mut url = Url::parse(HTML_URL).unwrap();
+        url.set_path(&format!("{}/{}", gist.uri.owner, gist.id.as_ref().unwrap()));
+        Ok(url.into_string())
+    }
 }
 
 /// Base URL to gist HTML pages.

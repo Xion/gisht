@@ -26,6 +26,10 @@ pub trait Host : Send + Sync {
     /// it may be updated instead (e.g. via pull rather than clone
     /// if its a Git repo).
     fn fetch_gist(&self, gist: &Gist) -> io::Result<()>;
+
+    /// Return a URL to a HTML page that can display the gist.
+    /// This may involving talking to the remote host.
+    fn gist_url(&self, gist: &Gist) -> io::Result<String>;
 }
 
 

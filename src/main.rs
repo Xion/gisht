@@ -18,6 +18,7 @@
              extern crate rustc_serialize;
              extern crate shlex;
              extern crate url;
+             extern crate webbrowser;
 
 
 mod args;
@@ -36,7 +37,7 @@ use std::path::PathBuf;
 use std::process::exit;
 
 use args::{Command, Locality, Options};
-use commands::{run_gist, print_binary_path, print_gist};
+use commands::{run_gist, print_binary_path, print_gist, open_gist};
 use gist::Gist;
 use util::exitcode;
 
@@ -84,7 +85,7 @@ fn main() {
         Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
         Command::Which => print_binary_path(&gist),
         Command::Print => print_gist(&gist),
-        _ => unimplemented!(),
+        Command::Open => open_gist(&gist),
     }
 }
 
