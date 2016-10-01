@@ -3,6 +3,7 @@
 //! Gists are represented as the Gist structure, with the auxiliary URI
 //! that helps refering to them as command line arguments to the program.
 
+mod info;
 mod uri;
 
 
