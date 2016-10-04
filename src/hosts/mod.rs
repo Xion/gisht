@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
 
-use super::gist::Gist;
+use super::gist::{self, Gist};
 
 
 /// Represents a gists' host: a (web) service that hosts gists (code snippets).
@@ -30,6 +30,17 @@ pub trait Host : Send + Sync {
     /// Return a URL to a HTML page that can display the gist.
     /// This may involving talking to the remote host.
     fn gist_url(&self, gist: &Gist) -> io::Result<String>;
+
+    /// Return a structure with information/metadata about the gist.
+    ///
+    /// Note: The return type for this method is io::Result<Option<Info>>
+    /// rather than Option<io::Result<Info>> because the availability of
+    /// gist metadata may be gist-specific (i.e. some gists have it,
+    /// some don't).
+    fn gist_info(&self, _: &Gist) -> io::Result<Option<gist::Info>> {
+        // This default indicates the host doesn't expose any gist metadata.
+        Ok(None)
+    }
 }
 
 

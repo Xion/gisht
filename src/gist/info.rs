@@ -66,18 +66,30 @@ impl Info {
 
 /// Builder for the gist Info struct.
 #[derive(Clone, Debug)]
-pub struct Builder {
+pub struct InfoBuilder {
     data: BTreeMap<Datum, Value>,
 }
 
-impl Builder {
+impl InfoBuilder {
     #[inline]
     pub fn new() -> Self {
-        Builder{data: BTreeMap::new()}
+        InfoBuilder{data: BTreeMap::new()}
     }
 
     #[inline]
-    pub fn set<V: ?Sized>(mut self, datum: Datum, value: &V) -> Self
+    pub fn with<V: ?Sized>(mut self, datum: Datum, value: &V) -> Self
+        where Value: Borrow<V>, V: ToOwned<Owned=Value>
+    {
+        self.set(datum, value); self
+    }
+
+    #[inline]
+    pub fn without(mut self, datum: Datum) -> Self {
+        self.unset(datum); self
+    }
+
+     #[inline]
+    pub fn set<V: ?Sized>(&mut self, datum: Datum, value: &V) -> &mut Self
         where Value: Borrow<V>, V: ToOwned<Owned=Value>
     {
         self.data.insert(datum, value.to_owned());
@@ -85,7 +97,7 @@ impl Builder {
     }
 
     #[inline]
-    pub fn unset(mut self, datum: Datum) -> Self {
+    pub fn unset(&mut self, datum: Datum,) -> &mut Self {
         self.data.remove(&datum); self
     }
 
@@ -98,7 +110,7 @@ impl Builder {
 
 #[cfg(test)]
 mod tests {
-    use super::{Datum, Builder};
+    use super::{Datum, InfoBuilder};
 
     #[test]
     fn datum_order_id_always_first() {
@@ -124,7 +136,7 @@ mod tests {
 
     #[test]
     fn info_empty() {
-        let info = Builder::new().build();
+        let info = InfoBuilder::new().build();
         for datum in Datum::iter_variants() {
             assert!(!info.has(datum));
             assert_eq!(datum.default_value(), *info.get(datum));
@@ -134,7 +146,7 @@ mod tests {
     #[test]
     fn info_regular() {
         let id = String::from("some_id");
-        let info = Builder::new()
+        let info = InfoBuilder::new()
             .set(Datum::Id, &id)
             .set(Datum::Owner, "JohnDoe")
             .set(Datum::Description, "Amazing gist")

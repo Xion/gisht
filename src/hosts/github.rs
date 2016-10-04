@@ -18,7 +18,7 @@ use url::Url;
 
 use super::super::USER_AGENT;
 use ext::hyper::header::Link;
-use gist::{self, Gist};
+use gist::{self, Datum, Gist};
 use util::{mark_executable, symlink_file};
 use super::Host;
 
@@ -42,17 +42,15 @@ impl Host for GitHub {
     /// If the gist hasn't been downloaded already, a clone of the gist's Git repo is performed.
     /// Otherwise, it's just a simple Git pull.
     fn fetch_gist(&self, gist: &Gist) -> io::Result<()> {
-        if gist.uri.host_id != "gh" {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, format!(
-                "expected a GitHub Gist, but got a '{}' one", gist.uri.host_id)));
-        }
-
+        try!(ensure_github_gist(gist));
         let gist = try!(resolve_gist(gist));
+
         if gist.is_local() {
             try!(update_gist(gist));
         } else {
             try!(clone_gist(gist));
         }
+
         Ok(())
     }
 
@@ -64,6 +62,29 @@ impl Host for GitHub {
         let mut url = Url::parse(HTML_URL).unwrap();
         url.set_path(&format!("{}/{}", gist.uri.owner, gist.id.as_ref().unwrap()));
         Ok(url.into_string())
+    }
+
+    /// Return a structure with gist metadata.
+    fn gist_info(&self, gist: &Gist) -> io::Result<Option<gist::Info>> {
+        try!(ensure_github_gist(gist));
+        let gist = try!(resolve_gist(gist));
+
+        let info = try!(get_gist_info(gist.id.as_ref().unwrap()));
+
+        // Build the gist::Info structure from known keys in the gist info JSON.
+        const INFO_FIELDS: &'static [(Datum, &'static str)] = &[
+            (Datum::Id, "id"),
+            (Datum::Description, "description"),
+            (Datum::Url, "html_url"),
+            (Datum::CreatedAt, "created_at"),
+            (Datum::UpdatedAt, "updated_at"),
+        ];
+        let mut result = gist::InfoBuilder::new();
+        for &(datum, field) in INFO_FIELDS {
+            result.set(datum, info[field].as_string().unwrap());
+        }
+        result.set(Datum::Owner, info["owner"]["login"].as_string().unwrap());
+        Ok(Some(result.build()))
     }
 }
 
@@ -158,24 +179,10 @@ fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
     // Talk to GitHub to obtain the URL that we can clone the gist from
     // as a Git repository.
     let clone_url = {
-        let http = Client::new();
-
-        let gist_url = {
-            let mut url = Url::parse(API_URL).unwrap();
-            url.set_path(&format!("gists/{}", gist.id.as_ref().unwrap()));
-            url.into_string()
-        };
-
-        debug!("Getting GitHub gist info from {}", gist_url);
-        let mut resp = try!(http.get(&gist_url)
-            .header(UserAgent(USER_AGENT.clone()))
-            .send()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
-        let gist_info_json = read_json(&mut resp);
-
-        let clone_url = gist_info_json["git_pull_url"].as_string().unwrap().to_owned();
+        let gist_info = try!(get_gist_info(&gist.id.as_ref().unwrap()));
+        let clone_url = gist_info["git_pull_url"].as_string().unwrap().to_owned();
         trace!("GitHub gist #{} has a git_pull_url=\"{}\"",
-            gist_info_json["id"].as_string().unwrap(), clone_url);
+            gist_info["id"].as_string().unwrap(), clone_url);
         clone_url
     };
 
@@ -263,7 +270,36 @@ fn list_gists(owner: &str) -> Vec<Gist> {
 }
 
 
+/// Retrieve information/metadata about a gist.
+/// Returns a Json object with the parsed GitHub response.
+fn get_gist_info(gist_id: &str) -> io::Result<Json> {
+    let http = Client::new();
+
+    let gist_url = {
+        let mut url = Url::parse(API_URL).unwrap();
+        url.set_path(&format!("gists/{}", gist_id));
+        url.into_string()
+    };
+
+    debug!("Getting GitHub gist info from {}", gist_url);
+    let mut resp = try!(http.get(&gist_url)
+        .header(UserAgent(USER_AGENT.clone()))
+        .send()
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
+    Ok(read_json(&mut resp))
+}
+
+
 // Utility functions
+
+/// Check if given Gist is a GitHub gist. Invoke using try!().
+fn ensure_github_gist(gist: &Gist) -> io::Result<()> {
+    if gist.uri.host_id != "gh" {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, format!(
+            "expected a GitHub Gist, but got a '{}' one", gist.uri.host_id)));
+    }
+    Ok(())
+}
 
 /// Read HTTP response from hype and parse it as JSON.
 fn read_json(response: &mut Response) -> Json {

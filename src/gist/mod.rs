@@ -10,8 +10,8 @@ mod uri;
 use std::path::PathBuf;
 
 use super::{BIN_DIR, GISTS_DIR};
+pub use self::info::{Datum, Info, InfoBuilder};
 pub use self::uri::{Uri, UriError};
-
 
 
 /// Structure representing a single gist.
