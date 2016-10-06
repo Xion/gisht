@@ -157,6 +157,19 @@ pub fn open_gist(gist: &Gist) -> ! {
 }
 
 
+/// Show summary information about the gist.
+pub fn show_gist_info(gist: &Gist) -> ! {
+    trace!("Obtaining informtion on {:?}", gist);
+    let maybe_info = gist.uri.host().gist_info(gist).unwrap_or_else(|e| {
+        panic!("Failed to obtain information about gist {}: {}", gist.uri, e);
+    });
+    match maybe_info {
+        Some(info) => { print!("{}", info); exit(exitcode::EX_OK) },
+        None => exit(exitcode::EX_UNAVAILABLE),
+    };
+}
+
+
 #[cfg(test)]
 mod tests {
     #[cfg(unix)]

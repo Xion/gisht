@@ -4,6 +4,7 @@
 
 use std::borrow::{Borrow, Cow};
 use std::collections::BTreeMap;
+use std::fmt;
 
 
 custom_derive! {
@@ -37,6 +38,19 @@ impl Datum {
         }
     }
 }
+impl fmt::Display for Datum {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let msg = match *self {
+            Datum::Id => "ID",
+            Datum::Owner => "Owner",
+            Datum::Url => "URL",
+            Datum::Description => "Description",
+            Datum::CreatedAt => "Created at",
+            Datum::UpdatedAt => "Last update",
+        };
+        write!(fmt, "{}", msg)
+    }
+}
 
 /// Type of gist info data values.
 pub type Value = String;
@@ -60,6 +74,16 @@ impl Info {
             Some(value) => Cow::Borrowed(value),
             None => Cow::Owned(datum.default_value().to_owned()),
         }
+    }
+}
+
+impl fmt::Display for Info {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        // TODO: align all colons vertically
+        for (datum, value) in &self.data {
+            try!(writeln!(fmt, "{}: {}", datum, value));
+        }
+        Ok(())
     }
 }
 
@@ -97,7 +121,7 @@ impl InfoBuilder {
     }
 
     #[inline]
-    pub fn unset(&mut self, datum: Datum,) -> &mut Self {
+    pub fn unset(&mut self, datum: Datum) -> &mut Self {
         self.data.remove(&datum); self
     }
 

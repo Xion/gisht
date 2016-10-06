@@ -37,7 +37,7 @@ use std::path::PathBuf;
 use std::process::exit;
 
 use args::{Command, Locality, Options};
-use commands::{run_gist, print_binary_path, print_gist, open_gist};
+use commands::{run_gist, print_binary_path, print_gist, open_gist, show_gist_info};
 use gist::Gist;
 use util::exitcode;
 
@@ -86,6 +86,7 @@ fn main() {
         Command::Which => print_binary_path(&gist),
         Command::Print => print_gist(&gist),
         Command::Open => open_gist(&gist),
+        Command::Info => show_gist_info(&gist),
     }
 }
 

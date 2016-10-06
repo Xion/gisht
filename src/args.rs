@@ -174,6 +174,8 @@ custom_derive! {
         Print,
         /// Open the gist's HTML page in the default web browser.
         Open,
+        /// Display summary information about the gist.
+        Info,
     }
 }
 
@@ -184,6 +186,7 @@ impl Command {
             Command::Which => "which",
             Command::Print => "print",
             Command::Open => "open",
+            Command::Info => "info",
         }
     }
 }
@@ -202,6 +205,7 @@ impl FromStr for Command {
             "which" => Ok(Command::Which),
             "print" => Ok(Command::Print),
             "open" => Ok(Command::Open),
+            "info" => Ok(Command::Info),
             _ => Err(Unrepresentable(s.to_owned())),
         }
     }
@@ -247,6 +251,9 @@ fn create_full_parser<'p>() -> Parser<'p> {
         .subcommand(SubCommand::with_name(Command::Open.name())
             .about("Open the gist's webpage")
             .arg(gist_arg("Gist to open")))
+        .subcommand(SubCommand::with_name(Command::Info.name())
+            .about("Display summary information about the gist")
+            .arg(gist_arg("Gist to display info on")))
 }
 
 /// Create the "base" argument parser object.

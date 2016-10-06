@@ -65,6 +65,7 @@ pub mod exitcode {
     pub const EX_OK: ExitCode = 0;
     pub const EX_USAGE: ExitCode = 64;
     pub const EX_NOINPUT: ExitCode = 66;
+    pub const EX_UNAVAILABLE: ExitCode = 69;
     pub const EX_OSFILE: ExitCode = 72;
     pub const EX_IOERR: ExitCode = 74;
     pub const EX_TEMPFAIL: ExitCode = 75;
