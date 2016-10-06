@@ -171,9 +171,9 @@ mod tests {
     fn info_regular() {
         let id = String::from("some_id");
         let info = InfoBuilder::new()
-            .set(Datum::Id, &id)
-            .set(Datum::Owner, "JohnDoe")
-            .set(Datum::Description, "Amazing gist")
+            .with(Datum::Id, &id)
+            .with(Datum::Owner, "JohnDoe")
+            .with(Datum::Description, "Amazing gist")
             .build();
         assert_eq!(id, *info.get(Datum::Id));
         assert_eq!("JohnDoe", *info.get(Datum::Owner));
