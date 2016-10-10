@@ -48,7 +48,7 @@ impl fmt::Display for Datum {
             Datum::CreatedAt => "Created at",
             Datum::UpdatedAt => "Last update",
         };
-        write!(fmt, "{}", msg)
+        fmt.pad(&msg)
     }
 }
 
@@ -79,9 +79,9 @@ impl Info {
 
 impl fmt::Display for Info {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        // TODO: align all colons vertically
+        let longest = self.data.keys().map(|k| format!("{}", k).len()).max().unwrap();
         for (datum, value) in &self.data {
-            try!(writeln!(fmt, "{}: {}", datum, value));
+            try!(writeln!(fmt, "{:w$} : {}", datum, value, w=longest));
         }
         Ok(())
     }
