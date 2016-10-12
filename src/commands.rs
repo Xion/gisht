@@ -62,6 +62,7 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
 }
 
 /// Guess an interpreter for given binary file based on its file extension.
+/// Returns the "format string" for the interpreter's command string.
 #[cfg(unix)]
 fn guess_interpreter<P: AsRef<Path>>(binary_path: P) -> Option<&'static str> {
     let extension = match binary_path.as_ref().extension() {
@@ -131,14 +132,18 @@ pub fn print_binary_path(gist: &Gist) -> ! {
 /// Print the source of the gist's binary.
 pub fn print_gist(gist: &Gist) -> ! {
     trace!("Printing source code of {:?}", gist);
-    let binary = fs::File::open(gist.binary_path()).unwrap_or_else(|e| {
+    let mut binary = fs::File::open(gist.binary_path()).unwrap_or_else(|e| {
         panic!("Failed to open the binary of gist {}: {}", gist.uri, e)
     });
-    for byte in binary.bytes() {
-        let byte = byte.unwrap_or_else(|e| {
-            panic!("Falled to read to the binary of gist {}: {}", gist.uri, e)
+
+    const BUF_SIZE: usize = 256;
+    let mut buf = [0; BUF_SIZE];
+    loop {
+        let c = binary.read(&mut buf).unwrap_or_else(|e| {
+            panic!("Falled to read the binary of gist {}: {}", gist.uri, e)
         });
-        io::stdout().write_all(&[byte]).unwrap();
+        io::stdout().write_all(&buf[0..c]).unwrap();
+        if c < BUF_SIZE { break }
     }
     exit(exitcode::EX_OK);
 }

@@ -48,7 +48,7 @@ impl fmt::Display for Datum {
             Datum::CreatedAt => "Created at",
             Datum::UpdatedAt => "Last update",
         };
-        fmt.pad(&msg)
+        fmt.pad(msg)
     }
 }
 
