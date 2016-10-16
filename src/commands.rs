@@ -164,7 +164,7 @@ pub fn open_gist(gist: &Gist) -> ! {
 
 /// Show summary information about the gist.
 pub fn show_gist_info(gist: &Gist) -> ! {
-    trace!("Obtaining informtion on {:?}", gist);
+    trace!("Obtaining information on {:?}", gist);
     let maybe_info = gist.uri.host().gist_info(gist).unwrap_or_else(|e| {
         panic!("Failed to obtain information about gist {}: {}", gist.uri, e);
     });
