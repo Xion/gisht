@@ -10,24 +10,65 @@ except ImportError:
 import sys
 
 from invoke import Collection, task
+import semver
 
 
-@task(help={
+MIN_RUSTC_VERSION = '1.12.0'
+
+HELP = {
     'release': "Whether to build the binary in release mode.",
-})
-def build(ctx, release=False):
+    'verbose': "Whether to show verbose logging output of the build",
+}
+
+
+@task(help=HELP)
+def build(ctx, release=False, verbose=False):
     """Build the project."""
-    flags = ['--release'] if release else []
-    cargo(ctx, 'build', *flags, wait=False)
+    ensure_rustc_version(ctx)
+    cargo(ctx, 'build', *get_rustc_flags(release, verbose), wait=False)
 
 
-@task
-def clean(ctx):
+@task(help=HELP)
+def clean(ctx, release=False, verbose=False):
     """Clean all build artifacts."""
-    cargo(ctx, 'clean', wait=False)
+    cargo(ctx, 'clean', *get_rustc_flags(release, verbose), wait=False)
+
+
+@task(help=HELP)
+def test(ctx, release=False, verbose=False):
+    """Run all the tests."""
+    ensure_rustc_version(ctx)
+    cargo(ctx, 'test', '--no-fail-fast', *get_rustc_flags(release, verbose),
+          wait=False)
 
 
 # Utility functions
+
+def ensure_rustc_version(ctx):
+    """Terminates the build unless the Rust compiler is recent enough."""
+    rustc_v = ctx.run('rustc --version', hide=True)
+    if not rustc_v.ok:
+        logging.critical("Rust compiler not found, aborting build.")
+        sys.exit(rustc_v.return_code)
+
+    _, version, _ = rustc_v.stdout.split(None, 2)
+    if not semver.match(version, '>=' + MIN_RUSTC_VERSION):
+        logging.error("Build requires at least Rust %s, found %s",
+                      MIN_RUSTC_VERSION, version)
+        sys.exit(1)
+
+    return True
+
+
+def get_rustc_flags(release, verbose):
+    """Return a list of Rust compiler flags corresponding to given params."""
+    flags = []
+    if release:
+        flags.append('--release')
+    if verbose:
+        flags.append('--verbose')
+    return flags
+
 
 def cargo(ctx, cmd, *args, **kwargs):
     """Run Cargo as if inside the specified crate directory.
@@ -53,12 +94,12 @@ def cargo(ctx, cmd, *args, **kwargs):
         os.execvp('cargo', argv)
 
 
-
 # Task setup
 
 ns = Collection()
 ns.add_task(build)
 ns.add_task(clean)
+ns.add_task(test, default=True)
 
 
 # This precondition makes it easier to localize files needed by tasks.
