@@ -25,21 +25,29 @@ HELP = {
 def build(ctx, release=False, verbose=False):
     """Build the project."""
     ensure_rustc_version(ctx)
-    cargo(ctx, 'build', *get_rustc_flags(release, verbose), wait=False)
+    cargo(ctx, 'build', *get_cargo_flags(release, verbose), wait=False)
 
 
 @task(help=HELP)
 def clean(ctx, release=False, verbose=False):
     """Clean all build artifacts."""
-    cargo(ctx, 'clean', *get_rustc_flags(release, verbose), wait=False)
+    cargo(ctx, 'clean', *get_cargo_flags(release, verbose), wait=False)
 
 
 @task(help=HELP)
 def test(ctx, release=False, verbose=False):
     """Run all the tests."""
     ensure_rustc_version(ctx)
-    cargo(ctx, 'test', '--no-fail-fast', *get_rustc_flags(release, verbose),
+    cargo(ctx, 'test', '--no-fail-fast', *get_cargo_flags(release, verbose),
           wait=False)
+
+
+@task
+def run(ctx):
+    """Run the binary."""
+    # Because we want to accept arbitrary arguments, we have to ferret them out
+    # of sys.argv manually.
+    cargo(ctx, 'run', *sys.argv[2:], wait=False)
 
 
 # Utility functions
@@ -60,8 +68,8 @@ def ensure_rustc_version(ctx):
     return True
 
 
-def get_rustc_flags(release, verbose):
-    """Return a list of Rust compiler flags corresponding to given params."""
+def get_cargo_flags(release, verbose):
+    """Return a list of Cargo flags corresponding to given params."""
     flags = []
     if release:
         flags.append('--release')
@@ -99,6 +107,7 @@ def cargo(ctx, cmd, *args, **kwargs):
 ns = Collection()
 ns.add_task(build)
 ns.add_task(clean)
+ns.add_task(run)
 ns.add_task(test, default=True)
 
 
