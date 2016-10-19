@@ -272,6 +272,16 @@ fn create_parser_base<'p>() -> Parser<'p> {
         .setting(AppSettings::UnifiedHelpMessage)
         .setting(AppSettings::DeriveDisplayOrder)
 
+        // Gist locality flags (shared by all subcommands).
+        .arg(Arg::with_name(OPT_LOCAL)
+            .long("cached").short("c")
+            .conflicts_with(OPT_REMOTE)
+            .help("Operate only on gists available locally"))
+        .arg(Arg::with_name(OPT_REMOTE)
+            .long("fetch").short("f")
+            .conflicts_with(OPT_LOCAL)
+            .help("Always fetch the gist from a remote host"))
+
         // Verbosity flags (shared by all subcommands).
         .arg(Arg::with_name(OPT_VERBOSE)
             .long("verbose").short("v")
@@ -283,16 +293,6 @@ fn create_parser_base<'p>() -> Parser<'p> {
             .set(ArgSettings::Multiple)
             .conflicts_with(OPT_VERBOSE)
             .help("Decrease logging verbosity"))
-
-        // Gist locality flags (shared by all subcommands).
-        .arg(Arg::with_name(OPT_LOCAL)
-            .long("cached").short("c")
-            .conflicts_with(OPT_REMOTE)
-            .help("Operate only on gists available locally"))
-        .arg(Arg::with_name(OPT_REMOTE)
-            .long("fetch").short("f")
-            .conflicts_with(OPT_LOCAL)
-            .help("Always fetch the gist from a remote host"))
 
         .help_short("H")
         .version_short("V")
