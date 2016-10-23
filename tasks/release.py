@@ -8,6 +8,7 @@ Refer to fpm's README for installation instructions.
 from itertools import starmap
 import logging
 from pathlib import Path
+import shutil
 try:
     from shlex import quote
 except ImportError:
@@ -30,10 +31,18 @@ PACKAGE_INFO = dict(
 
 SOURCE_DIR = Path.cwd() / 'target' / 'release'
 BIN = 'gisht'
+LICENSE_FILE = Path.cwd() / 'LICENSE'
 OUTPUT_DIR = Path.cwd() / 'release'
 
 # Directory where the binary should be installed on Linux systems.
 LINUX_INSTALL_DIR = '/usr/bin'
+
+
+@task(default=True)
+def all(ctx):
+    """Create all release packages."""
+    deb(ctx)
+    rpm(ctx)
 
 
 @task
@@ -46,6 +55,22 @@ def deb(ctx):
     logging.info("Preparing Debian package...")
     bundle(ctx, 'deb', prefix=LINUX_INSTALL_DIR)
     logging.debug("Debian package created.")
+
+
+@task
+def rpm(ctx):
+    """Create the release package for RedHat (.rpm)."""
+    ensure_fpm(ctx)
+    if not which(ctx, 'rpm'):
+        logging.warning("`rpm` not found, cannot create RedHat package.")
+        return 1
+
+    ensure_output_dir()
+    prepare_release(ctx)
+
+    logging.info("Reparing RedHat package...")
+    bundle(ctx, 'rpm', prefix=LINUX_INSTALL_DIR)
+    logging.debug("RedHat package created.")
 
 
 # Shared release stages
@@ -62,7 +87,8 @@ def prepare_release(ctx):
     else:
         logging.warning("'strip' not found, binary will retain debug symbols.")
 
-    # TODO: copy a license file to the output directory
+    # Ensure a license file is available in the source directory.
+    shutil.copy(str(LICENSE_FILE), str(SOURCE_DIR))
 
 
 def ensure_output_dir():
@@ -107,8 +133,8 @@ def bundle(ctx, target, **flags):
 
     # Use Gist SHA of HEAD revision as the --iteration value.
     if 'iteration' not in flags:
-        head_sha = ctx.run('git rev-parse --short HEAD', hide=True).stdout.strip()
-        flags['iteration'] = head_sha
+        sha = ctx.run('git rev-parse --short HEAD', hide=True).stdout.strip()
+        flags['iteration'] = sha
 
     def format_flag(name, value):
         return '-%s %s' % (name if len(name) == 1 else '-' + name,
