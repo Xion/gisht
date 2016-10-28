@@ -33,7 +33,7 @@ pub mod header {
         fn parse_header(raw: &[Vec<u8>]) -> hyper::Result<Link> {
             lazy_static! {
                 static ref RE: Regex = RegexBuilder::new(r#"
-                    \<(?P<url>[^>]+)\>;
+                    <(?P<url>[^>]+)>;
                     \s*
                     rel="(?P<rel>\w+)"
                 "#)
