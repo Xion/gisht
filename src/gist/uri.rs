@@ -63,7 +63,7 @@ impl FromStr for Uri {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         lazy_static! {
             static ref RE: Regex = Regex::new(
-                r"(?P<host>(\w+):)?((?P<owner>\w+)/)?(?P<name>.+)"
+                r"((?P<host>\w+):)?((?P<owner>\w+)/)?(?P<name>.+)"
             ).unwrap();
         }
         let parsed = try!(RE.captures(s)
@@ -135,5 +135,54 @@ impl fmt::Display for UriError {
             UriError::Malformed(ref u) => write!(fmt, "malformed gist URI: {}", u),
             UriError::UnknownHost(ref h) => write!(fmt, "unknown gist host ID: {}", h),
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+    use hosts::DEFAULT_HOST_ID;
+    use super::Uri;
+
+    #[test]
+    fn parse_empty() {
+        assert!(Uri::from_str("").is_err(), "Empty URI unexpectedly parsed");
+    }
+
+    #[test]
+    fn parse_just_name() {
+        let uri = Uri::from_str("foo").unwrap();
+        assert!(!uri.has_owner());
+        assert_eq!("foo", uri.name);
+    }
+
+    #[test]
+    fn parse_host_name() {
+        let uri = Uri::from_str(&format!("{}:foo", DEFAULT_HOST_ID)).unwrap();
+        assert_eq!(DEFAULT_HOST_ID, uri.host_id);
+        assert!(!uri.has_owner());
+        assert_eq!("foo", uri.name);
+    }
+
+    #[test]
+    fn parse_owner_name() {
+        let uri = Uri::from_str("foo/bar").unwrap();
+        assert_eq!("foo", uri.owner);
+        assert_eq!("bar", uri.name);
+    }
+
+    #[test]
+    fn parse_host_owner_name() {
+        let uri = Uri::from_str(&format!("{}:foo/bar", DEFAULT_HOST_ID)).unwrap();
+        assert_eq!(DEFAULT_HOST_ID, uri.host_id);
+        assert_eq!("foo", uri.owner);
+        assert_eq!("bar", uri.name);
+    }
+
+    #[test]
+    fn parse_invalid_host() {
+        assert!(Uri::from_str("totally_unknown_host:foo").is_err(),
+            "Gist URI with unknown host unexpectedly parsed");
     }
 }
