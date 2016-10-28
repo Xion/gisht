@@ -398,7 +398,7 @@ mod tests {
     }
 
     /// Verify that passing an invalid gist spec will cause an error.
-    #[]
+    #[test]
     fn invalid_gist() {
         let gist_uri = "foo:foo:foo";  // Invalid.
         let args = vec!["gisht", "run", gist_uri];
