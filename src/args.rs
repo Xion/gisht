@@ -2,10 +2,12 @@
 
 use std::env;
 use std::ffi::OsString;
+use std::io;
 use std::iter::IntoIterator;
+use std::process::exit;
 use std::str::FromStr;
 
-use clap::{self, AppSettings, Arg, ArgMatches, ArgSettings, SubCommand};
+use clap::{self, AppSettings, Arg, ArgMatches, ArgSettings, Shell, SubCommand};
 use conv::TryFrom;
 use conv::errors::Unrepresentable;
 
@@ -57,8 +59,41 @@ pub fn parse_from_argv<I, T>(argv: I) -> Result<Options, ArgsError>
         }
     };
 
-    let matches = try!(parser.get_matches_from_safe(argv));
+    let matches = try!(get_matches_with_completion(parser, argv));
     Options::try_from(matches)
+}
+
+/// Parse argv against given clap parser whilst handling the possible request
+/// for generating autocompletion script for that parser.
+fn get_matches_with_completion<'a, 'p, I, T>(parser: Parser<'p>, argv: I) -> Result<ArgMatches<'a>, clap::Error>
+    where 'p: 'a, I: IntoIterator<Item=T>, T: Into<OsString>
+{
+    const OPT_COMPLETION: &'static str = "completion";
+
+    let parser = parser
+        // Hidden flag that's used to generate shell completion scripts.
+        // It overrides the mandatory GIST arg.
+        .arg(Arg::with_name(OPT_COMPLETION)
+            .long("complete")
+            .required(false).conflicts_with(ARG_GIST)
+            .takes_value(true).max_values(1).multiple(false)
+            .possible_values(&Shell::variants())
+            .value_name("SHELL")
+            .help("Generate autocompletion script for given shell")
+            .set(ArgSettings::Hidden));
+
+    let matches = try!(parser.get_matches_from_safe(argv));
+
+    // If the completion flag was present, generate the scripts to stdout
+    // and quit immediately.
+    if let Some(shell) = matches.value_of(OPT_COMPLETION) {
+        debug!("Printing autocompletion script for {}...", shell);
+        create_full_parser()
+            .gen_completions_to(APP_NAME, shell.parse::<Shell>().unwrap(), &mut io::stdout());
+        exit(0);
+    }
+
+    Ok(matches)
 }
 
 
@@ -345,6 +380,7 @@ fn gist_arg(help: &'static str) -> Arg {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+    use clap::Shell;
     use super::{Command, create_full_parser, parse_from_argv};
 
     #[test]

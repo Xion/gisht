@@ -6,7 +6,7 @@ publish = false
 license = "GPLv3"
 
 [dependencies]
-clap = { version = "2.2.4", features = ["suggestions"] }
+clap = { version = "2.16.2", features = ["suggestions"] }
 conv = "0.3"
 custom_derive = "*"
 enum_derive = "*"
