@@ -31,12 +31,13 @@ mod util;
 
 
 use std::env;
+use std::error::Error;
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::exit;
 
-use args::{Command, Locality, Options};
+use args::{ArgsError, Command, Locality, Options};
 use commands::{run_gist, print_binary_path, print_gist, open_gist, show_gist_info};
 use gist::Gist;
 use util::exitcode;
@@ -74,7 +75,7 @@ lazy_static! {
 
 fn main() {
     let opts = args::parse().unwrap_or_else(|e| {
-        writeln!(&mut io::stderr(), "Failed to parse argv; {}", e).unwrap();
+        print_args_error(e);
         exit(exitcode::EX_USAGE);
     });
 
@@ -92,6 +93,23 @@ fn main() {
         Command::Open => open_gist(&gist),
         Command::Info => show_gist_info(&gist),
     }
+}
+
+/// Print an error that may occur while parsing arguments.
+fn print_args_error(e: ArgsError) {
+    match e {
+        ArgsError::Parse(ref e) =>
+            // In case of generic parse error,
+            // message provided by the clap library will be the usage string.
+            writeln!(&mut io::stderr(), "{}", e.message),
+        e => {
+            let mut msg = "Failed to parse argv".to_owned();
+            if let Some(cause) = e.cause() {
+                msg += &format!(": {}", cause);
+            }
+            writeln!(&mut io::stderr(), "{}", msg)
+        },
+    }.unwrap();
 }
 
 

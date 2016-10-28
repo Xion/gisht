@@ -115,6 +115,10 @@ fn resolve_gist(gist: &Gist) -> io::Result<Cow<Gist>> {
         let id = try!(id_from_binary_path(gist.binary_path()));
         Ok(Cow::Owned(gist.into_owned().with_id(id)))
     } else {
+        if !gist.uri.has_owner() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData, format!("Invalid GitHub gist: {}", gist.uri)));
+        }
         let gists = list_gists(&gist.uri.owner);
         match gists.into_iter().find(|g| gist.uri == g.uri) {
             Some(gist) => Ok(Cow::Owned(gist)),
