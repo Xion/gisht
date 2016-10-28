@@ -63,7 +63,7 @@ pub fn parse_from_argv<I, T>(argv: I) -> Result<Options, ArgsError>
 
 
 /// Structure to hold options received from the command line.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Options {
     /// Verbosity of the logging output.
     ///
@@ -254,6 +254,8 @@ fn create_full_parser<'p>() -> Parser<'p> {
         .subcommand(SubCommand::with_name(Command::Info.name())
             .about("Display summary information about the gist")
             .arg(gist_arg("Gist to display info on")))
+
+        .after_help("Hint: `gisht run GIST` can be shortened to just `gisht GIST`.")
 }
 
 /// Create the "base" argument parser object.
@@ -271,6 +273,7 @@ fn create_parser_base<'p>() -> Parser<'p> {
         .setting(AppSettings::ArgRequiredElseHelp)
         .setting(AppSettings::UnifiedHelpMessage)
         .setting(AppSettings::DeriveDisplayOrder)
+        .setting(AppSettings::ColorNever)
 
         // Gist locality flags (shared by all subcommands).
         .arg(Arg::with_name(OPT_LOCAL)
@@ -326,12 +329,45 @@ fn gist_arg(help: &'static str) -> Arg {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use super::Command;
+    use super::{Command, create_full_parser, parse_from_argv};
 
     #[test]
     fn command_names() {
         for cmd in Command::iter_variants() {
             assert_eq!(cmd, Command::from_str(cmd.name()).unwrap());
         }
+    }
+
+    /// Check if all gist subcommands are actually used in the argparser.
+    #[test]
+    fn commands_in_usage() {
+        // Usage will be returned as a failed parse Error's message.
+        // Empty argument list ensures we actually get the parse error.
+        let args: Vec<&'static str> = vec![];
+        let usage = format!("{}", create_full_parser()
+            .get_matches_from_safe(args).unwrap_err());
+
+        for cmd in Command::iter_variants() {
+            assert!(usage.contains(cmd.name()),
+                "Usage string doesn't contain the '{}' command.", cmd.name());
+        }
+    }
+
+    /// Verify that `run` subcommand is optional when running a gist without args.
+    #[test]
+    fn run_optional_no_args() {
+        let run_opts = parse_from_argv(vec!["gisht", "run", "test/test"]).unwrap();
+        let no_run_opts = parse_from_argv(vec!["gisht", "test/test"]).unwrap();
+        assert_eq!(run_opts, no_run_opts);
+    }
+
+    /// Verify that `run` subcommand is optional when running a gist with args.
+    #[test]
+    fn run_optonal_with_args() {
+        let run_opts = parse_from_argv(vec![
+            "gisht", "run", "test/test", "--", "some", "arg"]).unwrap();
+        let no_run_opts = parse_from_argv(vec![
+            "gisht", "test/test", "--", "some", "arg"]).unwrap();
+        assert_eq!(run_opts, no_run_opts);
     }
 }
