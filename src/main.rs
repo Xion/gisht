@@ -43,13 +43,14 @@ use util::exitcode;
 
 
 lazy_static! {
+    /// Application version, as filled out by Cargo.
+    static ref VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
+
     /// User-Agent header that the program uses for all outgoing HTTP requests.
-    static ref USER_AGENT: String =
-        if let Some(version) = option_env!("CARGO_PKG_VERSION") {
-            format!("gisht/{}", version)
-        } else {
-            "gisht".to_owned()
-        };
+    static ref USER_AGENT: String = match *VERSION {
+        Some(version) => format!("gisht/{}", version),
+        None => "gisht".to_owned(),
+    };
 }
 
 lazy_static! {
@@ -76,7 +77,10 @@ fn main() {
         writeln!(&mut io::stderr(), "Failed to parse argv; {}", e).unwrap();
         exit(exitcode::EX_USAGE);
     });
+
     logging::init(opts.verbosity).unwrap();
+    trace!("gisht {}", VERSION.map(|v| format!("v{}", v))
+        .unwrap_or_else(|| "(UNKNOWN VERSION)".to_owned()));
 
     ensure_app_dir(&opts);
 
@@ -108,6 +112,7 @@ fn ensure_app_dir(opts: &Options) {
             debug!("Warning not acknowledged -- exiting.");
             exit(2);
         }
+        trace!("Warning acknowledged.");
     } else {
         trace!("Quiet/non-interactive run, skipping untrusted code warning.");
     }
