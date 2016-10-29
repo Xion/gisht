@@ -17,6 +17,7 @@
              extern crate regex;
              extern crate rustc_serialize;
              extern crate shlex;
+             extern crate time;
              extern crate url;
              extern crate webbrowser;
 
@@ -58,6 +59,7 @@ lazy_static! {
     /// Main application's directory.
     static ref APP_DIR: PathBuf =
         env::home_dir().unwrap_or_else(|| env::temp_dir()).join(".gisht");
+    // TODO: use the app_dirs crate to get this in a more portable way
 
     /// Directory where gist sources are stored.
     ///
@@ -154,6 +156,7 @@ fn decode_gist(opts: &Options) -> Gist {
     if gist.is_local() {
         trace!("Gist {} found among already downloaded gists", gist.uri);
         if opts.locality == Some(Locality::Remote) {
+            debug!("Forcing update of gist {}...", gist.uri);
             if let Err(err) = gist.uri.host().fetch_gist(&gist) {
                 error!("Failed to update gist {}: {}", gist.uri, err);
                 exit(exitcode::EX_IOERR);
@@ -164,6 +167,7 @@ fn decode_gist(opts: &Options) -> Gist {
             error!("Gist {} is not available locally -- exiting.", gist.uri);
             exit(exitcode::EX_NOINPUT);
         }
+        debug!("Fetching non-local gist {}...", gist.uri);
         if let Err(err) = gist.uri.host().fetch_gist(&gist) {
             error!("Failed to download gist {}: {}", gist.uri, err);
             exit(exitcode::EX_IOERR);

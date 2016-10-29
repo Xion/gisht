@@ -76,7 +76,7 @@ fn get_matches_with_completion<'a, 'p, I, T>(parser: Parser<'p>, argv: I) -> Res
         .arg(Arg::with_name(OPT_COMPLETION)
             .long("complete")
             .required(false).conflicts_with(ARG_GIST)
-            .takes_value(true).max_values(1).multiple(false)
+            .takes_value(true).number_of_values(1).multiple(false)
             .possible_values(&Shell::variants())
             .value_name("SHELL")
             .help("Generate autocompletion script for given shell")
@@ -380,7 +380,6 @@ fn gist_arg(help: &'static str) -> Arg {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use clap::Shell;
     use super::{Command, create_full_parser, parse_from_argv};
 
     #[test]
