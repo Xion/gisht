@@ -4,6 +4,7 @@ use std::env;
 
 use env_logger::LogBuilder;
 use log::{LogLevel, LogLevelFilter, LogRecord, SetLoggerError};
+use time;
 
 
 // Arrays of log level filters, indexed by verbosity.
@@ -66,12 +67,35 @@ pub fn init(verbosity: isize) -> Result<(), SetLoggerError> {
 
 /// Format a single logging message using the metadata (log level etc.).
 fn format_log_record(record: &LogRecord) -> String {
+    let now = time::now();
+    let logtime = now.rfc3339();  // E.g.: 2012-02-22T07:53:18-07:00
+
     if record.level() >= LogLevel::Debug {
-        // TODO: include timestamp
         let location = record.location();
-        format!("{} {}#{}] {}",
-            record.level(), location.module_path(), location.line(), record.args())
+        format!("{}{} {}#{}] {}", format_log_level(record.level()), logtime,
+            location.module_path(), location.line(), record.args())
     } else {
-        format!("{} {}", record.level(), record.args())
+        format!("{}{} {}", format_log_level(record.level()), logtime, record.args())
+    }
+}
+
+/// Format the log level string.
+fn format_log_level(level: LogLevel) -> String {
+    let level = level.to_string();
+    let first_char = level.chars().next().unwrap();
+    first_char.to_uppercase().collect()
+}
+
+
+#[cfg(test)]
+mod tests {
+    use log::LogLevelFilter;
+    use super::{NEGATIVE_VERBOSITY_LEVELS, POSITIVE_VERBOSITY_LEVELS};
+
+    #[test]
+    fn verbosity_levels() {
+        assert_eq!(NEGATIVE_VERBOSITY_LEVELS[0], POSITIVE_VERBOSITY_LEVELS[0]);
+        assert!(NEGATIVE_VERBOSITY_LEVELS.contains(&LogLevelFilter::Off),
+            "Verbosity levels don't allow to turn logging off completely");
     }
 }
