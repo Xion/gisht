@@ -80,7 +80,7 @@ def prepare_release(ctx):
 
     This includes building the binary in --release mode.
     """
-    cargo(ctx, 'build', '--release')
+    cargo(ctx, 'build', '--release', '--color', 'always')
 
     if which(ctx, 'strip'):
         ctx.run('strip %s' % (SOURCE_DIR / BIN))
