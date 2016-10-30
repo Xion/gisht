@@ -23,6 +23,10 @@ use util::{mark_executable, symlink_file};
 use super::Host;
 
 
+/// GitHub host ID.
+pub const ID: &'static str = "gh";
+
+
 #[derive(Debug)]
 pub struct GitHub {
     _marker: PhantomData<()>,
@@ -248,7 +252,7 @@ fn list_gists(owner: &str) -> Vec<Gist> {
                 gist_files.sort();
                 let gist_name = gist_files[0];
 
-                let gist_uri = gist::Uri::new("gh", owner, gist_name).unwrap();
+                let gist_uri = gist::Uri::new(ID, owner, gist_name).unwrap();
                 trace!("GitHub gist found ({}) with id={}", gist_uri, id);
                 if !result.insert(Gist::new(gist_uri, id)) {
                     // TODO: find a way to warn the user about this ambiguity
@@ -298,7 +302,7 @@ fn get_gist_info(gist_id: &str) -> io::Result<Json> {
 
 /// Check if given Gist is a GitHub gist. Invoke using try!().
 fn ensure_github_gist(gist: &Gist) -> io::Result<()> {
-    if gist.uri.host_id != "gh" {
+    if gist.uri.host_id != ID {
         return Err(io::Error::new(io::ErrorKind::InvalidData, format!(
             "expected a GitHub Gist, but got a '{}' one", gist.uri.host_id)));
     }
