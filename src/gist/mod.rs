@@ -36,8 +36,8 @@ impl Gist {
 
     /// Create the copy of Gist that has given ID attached.
     #[inline]
-    pub fn with_id(self, id: String) -> Self {
-        Gist{id: Some(id), ..self}
+    pub fn with_id<S: ToString>(self, id: S) -> Self {
+        Gist{id: Some(id.to_string()), ..self}
     }
 }
 
@@ -57,12 +57,14 @@ impl Gist {
 
     /// Returns the path to the gist's binary
     /// (regardless whether it was downloaded or not).
+    #[inline]
     pub fn binary_path(&self) -> PathBuf {
         let uri_path: PathBuf = self.uri.clone().into();
         BIN_DIR.join(uri_path)
     }
 
     /// Whether the gist has been downloaded previously.
+    #[inline]
     pub fn is_local(&self) -> bool {
         // Path::exists() will traverse symlinks, so this also ensures
         // that the target "binary" file of the gist exists.
@@ -79,5 +81,37 @@ impl PartialEq<Gist> for Gist {
             return false;
         }
         true
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use gist::Uri;
+    use hosts;
+    use super::Gist;
+
+    const HOST_ID: &'static str = hosts::DEFAULT_HOST_ID;
+    const OWNER: &'static str = "JohnDoe";
+    const NAME: &'static str = "foo";
+    const ID: &'static str = "1234abcd5678efgh";
+
+    #[test]
+    fn path_without_id() {
+        let gist = Gist::from_uri(Uri::new(HOST_ID, OWNER, NAME).unwrap());
+        let path = gist.path().to_str().unwrap().to_owned();
+        assert!(path.contains(HOST_ID), "Gist path should contain host ID");
+        assert!(path.contains(OWNER), "Gist path should contain owner");
+        assert!(path.contains(NAME), "Gist path should contain gist name");
+    }
+
+    #[test]
+    fn path_with_id() {
+        let gist = Gist::from_uri(Uri::from_name(HOST_ID, NAME).unwrap())
+            .with_id(ID);
+        let path = gist.path().to_str().unwrap().to_owned();
+        assert!(path.contains(HOST_ID), "Gist path should contain host ID");
+        assert!(path.contains(ID), "Gist path should contain gist ID");
+        assert!(!path.contains(NAME), "Gist path shouldn't contain gist name");
     }
 }
