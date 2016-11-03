@@ -1,6 +1,8 @@
 [package]
 name = "gisht"
 version = "0.1.0"
+description = "Gists in the shell"
+homepage = "http://github.com/Xion/gisht"
 authors = ["Karol Kuczmarski <karol.kuczmarski@gmail.com>"]
 publish = false
 license = "GPLv3"

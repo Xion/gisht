@@ -21,13 +21,17 @@ import toml
 from tasks.util import cargo
 
 
-# TODO: get name, license, and maintainer from Cargo.toml
+# Package information.
+#
+# Fields that map to tuples are retrieved from the corresponding field path
+# in Cargo.toml (and optionally undergo transformations through functions).
 PACKAGE_INFO = dict(
-    name="gisht",
-    description="Gists in the shell",
-    url="http://github.com/Xion/gisht",
-    license="GPL v3",
-    maintainer="Karol Kuczmarski",
+    name=('package', 'name'),
+    description=('package', 'description'),
+    url=('package', 'homepage'),
+    license=('package', 'license'),
+    maintainer=('package', 'authors', 0,
+                lambda v: v[:v.find('<') - 1] if '<' in v else v),
 )
 
 SOURCE_DIR = Path.cwd() / 'target' / 'release'
@@ -121,17 +125,16 @@ def bundle(ctx, target, **flags):
 
     :return: Invoke's process object
     """
+    package_info = read_package_info()
+
     # Define the fpm's input and output.
     flags.update(s='dir', C=str(SOURCE_DIR))
     flags.update(
         t=target,
-        package=str(OUTPUT_DIR / ('%s.%s' % (PACKAGE_INFO['name'], target))))
+        package=str(OUTPUT_DIR / ('%s.%s' % (package_info['name'], target))))
 
     # Provide package information.
-    version = get_version()
-    if version:
-        flags.setdefault('version', version)
-    for key, value in PACKAGE_INFO.iteritems():
+    for key, value in package_info.items():
         flags.setdefault(key, value)
     flags.setdefault('vendor', "<unspecified>")
 
@@ -143,11 +146,37 @@ def bundle(ctx, target, **flags):
     def format_flag(name, value):
         return '-%s %s' % (name if len(name) == 1 else '-' + name,
                            quote(value))
-    fpm_args = ' '.join(starmap(format_flag, flags.iteritems()))
+    fpm_args = ' '.join(starmap(format_flag, flags.items()))
     fpm_cmdline = 'fpm --force --log error %s %s' % (fpm_args, BIN)
 
     logging.debug("Running %s" % fpm_cmdline)
     return ctx.run(fpm_cmdline)
+
+
+def read_package_info(cargo_toml=None):
+    """Read package info from the [package] section of Cargo.toml.
+
+    :return: Dictionary mapping PACKAGE_FIELDS to their values
+    """
+    cargo_toml = Path(cargo_toml or Path.cwd() / 'Cargo.toml')
+    with cargo_toml.open() as f:
+        package_conf = toml.load(f)
+
+    # PACKAGE_INFO defines how to obtain package info from Cargo.toml
+    # by providing either a tuple of subsequent keys to follow / transformations
+    # to apply; or a verbatim value.
+    result = {}
+    for field, spec in PACKAGE_INFO.items():
+        if isinstance(spec, tuple):
+            value = package_conf
+            for step in spec:
+                value = step(value) if callable(step) else value[step]
+        else:
+            value = spec
+        if value is not None:
+            result[field] = value
+
+    return result
 
 
 # Utility functions
@@ -162,16 +191,3 @@ def ensure_fpm(ctx):
 def which(ctx, prog):
     """Runs $ which prog."""
     return ctx.run('which %s' % prog, warn=True, hide=True)
-
-
-def get_version(cargo_toml=None):
-    """Retrieve Rust package version from Cargo.toml.
-    Returns None if the version isn't present.
-    """
-    cargo_toml = Path(cargo_toml or Path.cwd() / 'Cargo.toml')
-    with cargo_toml.open() as f:
-        package_conf = toml.load(f)
-    try:
-        return package_conf['package'].get('version')
-    except KeyError:
-        raise IOError("Malformed Cargo.toml: no [package] section found")
