@@ -16,13 +16,14 @@ except ImportError:
 import sys
 
 from invoke import task
+import toml
 
 from tasks.util import cargo
 
 
+# TODO: get name, license, and maintainer from Cargo.toml
 PACKAGE_INFO = dict(
     name="gisht",
-    version="1.0",  # TODO: read from Cargo.toml
     description="Gists in the shell",
     url="http://github.com/Xion/gisht",
     license="GPL v3",
@@ -68,7 +69,7 @@ def rpm(ctx):
     ensure_output_dir()
     prepare_release(ctx)
 
-    logging.info("Reparing RedHat package...")
+    logging.info("Preparing RedHat package...")
     bundle(ctx, 'rpm', prefix=LINUX_INSTALL_DIR)
     logging.debug("RedHat package created.")
 
@@ -127,6 +128,9 @@ def bundle(ctx, target, **flags):
         package=str(OUTPUT_DIR / ('%s.%s' % (PACKAGE_INFO['name'], target))))
 
     # Provide package information.
+    version = get_version()
+    if version:
+        flags.setdefault('version', version)
     for key, value in PACKAGE_INFO.iteritems():
         flags.setdefault(key, value)
     flags.setdefault('vendor', "<unspecified>")
@@ -158,3 +162,16 @@ def ensure_fpm(ctx):
 def which(ctx, prog):
     """Runs $ which prog."""
     return ctx.run('which %s' % prog, warn=True, hide=True)
+
+
+def get_version(cargo_toml=None):
+    """Retrieve Rust package version from Cargo.toml.
+    Returns None if the version isn't present.
+    """
+    cargo_toml = Path(cargo_toml or Path.cwd() / 'Cargo.toml')
+    with cargo_toml.open() as f:
+        package_conf = toml.load(f)
+    try:
+        return package_conf['package'].get('version')
+    except KeyError:
+        raise IOError("Malformed Cargo.toml: no [package] section found")

@@ -7,3 +7,4 @@ invoke>=0.13
 # Dependencies used directly by automation tasks
 pathlib
 semver
+toml
