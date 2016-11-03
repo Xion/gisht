@@ -114,4 +114,13 @@ mod tests {
         assert!(path.contains(ID), "Gist path should contain gist ID");
         assert!(!path.contains(NAME), "Gist path shouldn't contain gist name");
     }
+
+    #[test]
+    fn binary_path() {
+        let gist = Gist::from_uri(Uri::new(HOST_ID, OWNER, NAME).unwrap());
+        let path = gist.binary_path().to_str().unwrap().to_owned();
+        assert!(path.contains(HOST_ID), "Gist binary path should contain host ID");
+        assert!(path.contains(OWNER), "Gist binary path should contain owner");
+        assert!(path.contains(NAME), "Gist binary path should contain gist name");
+    }
 }
