@@ -99,12 +99,11 @@ def prepare_release(ctx):
 def ensure_output_dir():
     """Ensure that the release directory exists."""
     if OUTPUT_DIR.exists():
-        if not OUTPUT_DIR.is_dir():
-            logging.error(
-                "Output path %s already exists but it's not a directory!",
-                OUTPUT_DIR)
-            sys.exit(2)
         return
+    if not OUTPUT_DIR.is_dir():
+        logging.error("Output path %s already exists but it's not a directory!",
+                      OUTPUT_DIR)
+        sys.exit(2)
 
     try:
         logging.info("Creating output directory (%s)...", OUTPUT_DIR)
