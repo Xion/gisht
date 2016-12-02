@@ -6,20 +6,28 @@
              extern crate conv;
 #[macro_use] extern crate custom_derive;
 #[macro_use] extern crate enum_derive;
-             extern crate env_logger;
 #[macro_use] extern crate error_derive;
              extern crate git2;
              extern crate hyper;
              extern crate isatty;
 #[macro_use] extern crate lazy_static;
-#[macro_use] extern crate log;
 #[macro_use] extern crate maplit;
              extern crate regex;
              extern crate rustc_serialize;
              extern crate shlex;
+             extern crate slog_envlogger;
+             extern crate slog_stdlog;
+             extern crate slog_term;
              extern crate time;
              extern crate url;
              extern crate webbrowser;
+
+// `slog` must precede `log` in declarations here, because we want to simultenously:
+// * use the standard `log` macros (at least for a while)
+// * be able to initiaize the slog logger using slog macros like o!()
+#[macro_use] extern crate slog;
+#[macro_use] extern crate log;
+// TODO: when migrating to slog completely, `log` can be removed and order restored
 
 
 mod args;
