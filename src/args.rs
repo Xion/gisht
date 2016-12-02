@@ -66,7 +66,7 @@ pub fn parse_from_argv<I, T>(argv: I) -> Result<Options, ArgsError>
 /// Parse argv against given clap parser whilst handling the possible request
 /// for generating autocompletion script for that parser.
 fn get_matches_with_completion<'a, 'p, I, T>(parser: Parser<'p>, argv: I) -> Result<ArgMatches<'a>, clap::Error>
-    where 'p: 'a, I: IntoIterator<Item=T>, T: Into<OsString>
+    where 'p: 'a, I: IntoIterator<Item=T>, T: Into<OsString> + Clone
 {
     const OPT_COMPLETION: &'static str = "completion";
 
