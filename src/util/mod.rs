@@ -5,6 +5,16 @@ use std::io;
 use std::path::Path;
 
 
+/// Like try!(), but the return Some(Err(err)) in case of error.
+/// Compatible with functions returning Option<Result<T, E>>.
+macro_rules! try_some {
+    ($ex:expr) => (match $ex {
+        Ok(value) => value,
+        Err(error) => return Some(Err(error)),
+    })
+}
+
+
 #[cfg(windows)]
 pub const LINESEP: &'static str = "\r\n";
 #[cfg(not(windows))]

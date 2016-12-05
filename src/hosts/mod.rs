@@ -28,7 +28,7 @@ pub trait Host : Send + Sync {
     fn fetch_gist(&self, gist: &Gist) -> io::Result<()>;
 
     /// Return a URL to a HTML page that can display the gist.
-    /// This may involving talking to the remote host.
+    /// This may involve talking to the remote host.
     fn gist_url(&self, gist: &Gist) -> io::Result<String>;
 
     /// Return a structure with information/metadata about the gist.
@@ -40,6 +40,17 @@ pub trait Host : Send + Sync {
     fn gist_info(&self, _: &Gist) -> io::Result<Option<gist::Info>> {
         // This default indicates the host doesn't expose any gist metadata.
         Ok(None)
+    }
+
+    /// Return a (fetched) gist corresponding to the given URL.
+    /// The URL will typically point to a user-facing HTML page of the gist.
+    ///
+    /// Note: The return type of this method is an Option (Option<io::Result<Gist>>)
+    /// because the URL may not be recognized as belonging to this host.
+    fn resolve_url(&self, _: &str) -> Option<io::Result<Gist>> {
+        // This default indicates that the URL wasn't recognized
+        // as pointing to any gist hosted by this host.
+        None
     }
 }
 

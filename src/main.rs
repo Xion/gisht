@@ -30,13 +30,15 @@
 // TODO: when migrating to slog completely, `log` can be removed and order restored
 
 
+#[macro_use]
+mod util;
+
 mod args;
 mod commands;
 mod ext;
 mod gist;
 mod hosts;
 mod logging;
-mod util;
 
 
 use std::env;

@@ -8,7 +8,7 @@ TBD
 
 ## Development
 
-`gisht` is written in Rust. Besides the Rust toolchain, the build requirements include:
+`gisht` is written in Rust. Besides the [Rust toolchain](http://rustup.sh), build requirements include:
 
 * cmake (for compiling the libgit2)
 

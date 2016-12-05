@@ -14,6 +14,7 @@ use std::time::{Duration, SystemTime};
 use git2::{self, Repository};
 use hyper::client::{Client, Response};
 use hyper::header::{ContentLength, UserAgent};
+use regex::{self, Regex};
 use rustc_serialize::json::Json;
 use url::Url;
 
@@ -93,10 +94,43 @@ impl Host for GitHub {
         result.set(Datum::Owner, info["owner"]["login"].as_string().unwrap());
         Ok(Some(result.build()))
     }
+
+    /// Return a Gist based on URL to its URL page.
+    fn resolve_url(&self, url: &str) -> Option<io::Result<Gist>> {
+        let captures = match HTML_URL_RE.captures(url) {
+            Some(c) => c,
+            None => return None,
+        };
+
+        // Obtain gist information using GitHub API and use it construct the gist URI.
+        let owner = captures.name("owner").unwrap();
+        let id = captures.name("id").unwrap();
+        let info = try_some!(get_gist_info(id));
+        let name = match gist_name_from_info(&info) {
+            Some(name) => name,
+            None => {
+                warn!("GitHub gist with ID={} (URL={}) has no files", id, url);
+                return None;
+            },
+        };
+
+        // Fetch the gist and return it.
+        let uri = gist::Uri::new(ID, owner, name).unwrap();
+        let gist = Gist::from_uri(uri).with_id(id);
+        try_some!(self.fetch_gist(&gist));
+        Some(Ok(gist))
+    }
 }
 
 /// Base URL to gist HTML pages.
 const HTML_URL: &'static str = "http://gist.github.com";
+
+lazy_static! {
+    /// Regular expression for parsing URLs to gist HTML pages.
+    static ref HTML_URL_RE: Regex = Regex::new(
+        &format!("{}{}", regex::quote(HTML_URL), r#"/(?P<owner>[^/]+)/(?P<id>\d+)"#)
+    ).unwrap();
+}
 
 
 // Fetching gists
@@ -281,17 +315,13 @@ fn list_gists(owner: &str) -> Vec<Gist> {
             trace!("Result page with {} gist(s) found", gists.len());
             for gist in gists {
                 let id = gist["id"].as_string().unwrap();
-
-                // GitHub names gists after first files in alphabetical order,
-                // so we need to find that first file.
-                let mut gist_files: Vec<_> = gist["files"].as_object().unwrap()
-                    .keys().collect();
-                if gist_files.is_empty() {
-                    warn!("GitHub gist #{} (owner={}) has no files", id, owner);
-                    continue;
-                }
-                gist_files.sort();
-                let gist_name = gist_files[0];
+                let gist_name = match gist_name_from_info(&gist) {
+                    Some(name) => name,
+                    None => {
+                        warn!("GitHub gist #{} (owner={}) has no files", id, owner);
+                        continue;
+                    },
+                };
 
                 let gist_uri = gist::Uri::new(ID, owner, gist_name).unwrap();
                 trace!("GitHub gist found ({}) with id={}", gist_uri, id);
@@ -338,6 +368,21 @@ fn get_gist_info(gist_id: &str) -> io::Result<Json> {
     Ok(read_json(&mut resp))
 }
 
+/// Retrive gist name from the parsed JSON of gist info.
+///
+/// The gist name is defined to be the name of its first file,
+/// as this is how GitHub page itself picks it.
+fn gist_name_from_info(info: &Json) -> Option<&str> {
+    let mut files: Vec<_> = info["files"].as_object().unwrap()
+        .keys().collect();
+    if files.is_empty() {
+        None
+    } else {
+        files.sort();
+        Some(files[0])
+    }
+}
+
 
 // Utility functions
 
@@ -358,4 +403,43 @@ fn read_json(response: &mut Response) -> Json {
     };
     response.read_to_string(&mut body).unwrap();
     Json::from_str(&body).unwrap()
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::{HTML_URL, HTML_URL_RE};
+
+    #[test]
+    fn html_url_regex() {
+        lazy_static! {
+            static ref VALID_HTML_URLS: Vec<(/* URL */   String,
+                                             /* owner */ &'static str,
+                                             /* ID */    &'static str)> = vec![
+                (HTML_URL.to_owned() + "/foo/123456", "foo", "123456"),
+                (HTML_URL.to_owned() + "/Xion/67424258", "Xion", "67424258"),
+                (HTML_URL.to_owned() + "/octo-cat/125783657823653178", "octo-cat", "125783657823653178"),
+                (HTML_URL.to_owned() + "/a/1", "a", "1"),
+            ];
+            static ref INVALID_HTML_URLS: Vec<String> = vec![
+                HTML_URL.to_owned() + "/a/b/c",         // too many path segments
+                HTML_URL.to_owned() + "/a/b1",          // ID must be a number
+                HTML_URL.to_owned() + "/a",             // ID must be provided
+                HTML_URL.to_owned() + "//1",            // owner must not be empty
+                "http://github.com/Xion/gisht".into(),  // wrong GitHub domain
+                "http://example.com/foo/bar".into(),    // wrong domain altogether
+                "foobar".into(),                        // not even an URL
+            ];
+        }
+        for &(ref valid_url, owner, id) in &*VALID_HTML_URLS {
+            let captures = HTML_URL_RE.captures(valid_url)
+                .expect(&format!("Gist HTML URL was incorrectly deemed invalid: {}", valid_url));
+            assert_eq!(owner, captures.name("owner").unwrap());
+            assert_eq!(id, captures.name("id").unwrap());
+        }
+        for ref invalid_url in &*INVALID_HTML_URLS {
+            assert!(!HTML_URL_RE.is_match(invalid_url),
+                "URL was incorrectly deemed a valid gist HTML URL: {}", invalid_url);
+        }
+    }
 }
