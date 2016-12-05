@@ -10,6 +10,7 @@ use std::str::FromStr;
 use clap::{self, AppSettings, Arg, ArgMatches, ArgSettings, Shell, SubCommand};
 use conv::TryFrom;
 use conv::errors::Unrepresentable;
+use url;
 
 use super::gist;
 
@@ -112,8 +113,8 @@ pub struct Options {
     pub locality: Option<Locality>,
     /// Gist command that's been issued.
     pub command: Command,
-    /// URI to the gist to operate on.
-    pub gist_uri: gist::Uri,
+    /// Gist to operate on.
+    pub gist: GistArg,
     /// Arguments to the gist, if any.
     /// This is only used if command == Some(Command::Run).
     pub gist_args: Option<Vec<String>>,
@@ -149,8 +150,8 @@ impl<'a> TryFrom<ArgMatches<'a>> for Options {
         let cmd_matches = cmd_matches.unwrap_or(&matches);
         let command = Command::from_str(cmd).unwrap_or(Command::Run);
 
-        // Parse out the gist URI argument.
-        let gist_uri = try!(gist::Uri::from_str(
+        // Parse out the gist argument.
+        let gist = try!(GistArg::from_str(
             cmd_matches.value_of(ARG_GIST).unwrap()
         ));
 
@@ -165,7 +166,7 @@ impl<'a> TryFrom<ArgMatches<'a>> for Options {
             verbosity: verbosity,
             locality: locality,
             command: command,
-            gist_uri: gist_uri,
+            gist: gist,
             gist_args: gist_args,
         })
     }
@@ -179,7 +180,7 @@ custom_derive! {
         /// General when parsing the arguments.
         Parse(clap::Error),
         /// Error while parsing the gist URI.
-        Gist(gist::UriError),
+        Gist(GistError),
     }
 }
 impl PartialEq for ArgsError {
@@ -194,6 +195,47 @@ impl PartialEq for ArgsError {
             (&ArgsError::Gist(ref g1), &ArgsError::Gist(ref g2)) => g1 == g2,
             _ => false,
         }
+    }
+}
+
+
+/// Type holding the value of the GIST argument.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GistArg {
+    /// A gist URI, like "Octocat/hello" or "gh:Foo/bar"
+    Uri(gist::Uri),
+    /// A URL to a gist's browser page (that we hopefully recognize).
+    BrowserUrl(url::Url),
+}
+
+impl FromStr for GistArg {
+    type Err = GistError;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        // This is kind of a crappy heuristic but it should suffice for now.
+        let s = input.trim().to_lowercase();
+        let is_browser_url = ["http://", "https://", "www."].iter()
+            .any(|p| s.starts_with(p));
+
+        if is_browser_url {
+            let gist_url = try!(url::Url::from_str(input));
+            Ok(GistArg::BrowserUrl(gist_url))
+        } else {
+            let uri = try!(gist::Uri::from_str(input));
+            Ok(GistArg::Uri(uri))
+        }
+    }
+}
+
+custom_derive! {
+    /// Erorr that can occur while parsing of the GIST argument.
+    #[derive(Debug, PartialEq,
+             Error("gist argument error"), ErrorDisplay, ErrorFrom)]
+    pub enum GistError {
+        /// Error while parsing gist URI.
+        Uri(gist::UriError),
+        /// Error while parsing gist's browser URL.
+        BrowserUrl(url::ParseError),
     }
 }
 

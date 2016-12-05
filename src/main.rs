@@ -48,7 +48,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::exit;
 
-use args::{ArgsError, Command, Locality, Options};
+use args::{ArgsError, Command, GistArg, Locality, Options};
 use commands::{run_gist, print_binary_path, print_gist, open_gist, show_gist_info};
 use gist::Gist;
 use util::exitcode;
@@ -115,7 +115,7 @@ fn print_args_error(e: ArgsError) {
             // message provided by the clap library will be the usage string.
             writeln!(&mut io::stderr(), "{}", e.message),
         e => {
-            let mut msg = "Failed to parse argv".to_owned();
+            let mut msg = "Failed to parse arguments".to_owned();
             if let Some(cause) = e.cause() {
                 msg += &format!(": {}", cause);
             }
@@ -156,13 +156,25 @@ fn ensure_app_dir(opts: &Options) {
     debug!("Application directory ({}) created successfully.", APP_DIR.display());
 }
 
+
 /// Use command line arguments to obtain a Gist object.
 /// This may include fetching a fresh gist from a host, or updating it.
 fn decode_gist(opts: &Options) -> Gist {
-    let uri = opts.gist_uri.clone();
-    debug!("Gist {} specified as the argument", uri);
+    let gist = match opts.gist {
+        GistArg::Uri(ref uri) => {
+            debug!("Gist {} specified as the argument", uri);
+            Gist::from_uri(uri.clone())
+        },
+        GistArg::BrowserUrl(ref url) => {
+            debug!("Gist URL `{}` specified as the argument", url);
+            let url = url.as_str();
+            gist_from_url(url).unwrap_or_else(|| {
+                error!("URL doesn't point to any gist service: {}", url);
+                exit(exitcode::EX_UNAVAILABLE);
+            })
+        },
+    };
 
-    let gist = Gist::from_uri(uri);
     if gist.is_local() {
         trace!("Gist {} found among already downloaded gists", gist.uri);
         if opts.locality == Some(Locality::Remote) {
@@ -185,6 +197,22 @@ fn decode_gist(opts: &Options) -> Gist {
     }
 
     gist
+}
+
+/// Ask each of the known gist hosts if they can resolve this URL into a gist.
+fn gist_from_url(url: &str) -> Option<Gist> {
+    for (id, host) in &*hosts::HOSTS {
+        if let Some(res) = host.resolve_url(url) {
+            let gist = res.unwrap_or_else(|err| {
+                error!("Failed to download {} gist from a URL ({}): {}",
+                    host.name(), url, err);
+                exit(exitcode::EX_IOERR);
+            });
+            trace!("URL `{}` identified as `{}` ({}) gist", url, id, host.name());
+            return Some(gist);
+        }
+    }
+    None
 }
 
 

@@ -97,12 +97,16 @@ impl Host for GitHub {
 
     /// Return a Gist based on URL to its URL page.
     fn resolve_url(&self, url: &str) -> Option<io::Result<Gist>> {
+        // TODO: add more logging here
+
         let captures = match HTML_URL_RE.captures(url) {
             Some(c) => c,
             None => return None,
         };
 
         // Obtain gist information using GitHub API and use it construct the gist URI.
+        // TODO: owner is actually optional (URL returned by GitHub API doesn't have it, for example).
+        // handle this; we'll need to get the owner from gist info
         let owner = captures.name("owner").unwrap();
         let id = captures.name("id").unwrap();
         let info = try_some!(get_gist_info(id));
@@ -123,7 +127,7 @@ impl Host for GitHub {
 }
 
 /// Base URL to gist HTML pages.
-const HTML_URL: &'static str = "http://gist.github.com";
+const HTML_URL: &'static str = "https://gist.github.com";
 
 lazy_static! {
     /// Regular expression for parsing URLs to gist HTML pages.
@@ -184,7 +188,6 @@ fn id_from_binary_path<P: AsRef<Path>>(path: P) -> io::Result<String> {
         .and_then(|s| s.to_str()).map(String::from)
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound,
             format!("Invalid GitHub gist binary path: {}", path.display())))
-
 }
 
 
@@ -262,10 +265,10 @@ fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
     // Talk to GitHub to obtain the URL that we can clone the gist from
     // as a Git repository.
     let clone_url = {
-        let gist_info = try!(get_gist_info(&gist.id.as_ref().unwrap()));
-        let clone_url = gist_info["git_pull_url"].as_string().unwrap().to_owned();
+        let info = try!(get_gist_info(&gist.id.as_ref().unwrap()));
+        let clone_url = info["git_pull_url"].as_string().unwrap().to_owned();
         trace!("GitHub gist #{} has a git_pull_url=\"{}\"",
-            gist_info["id"].as_string().unwrap(), clone_url);
+            info["id"].as_string().unwrap(), clone_url);
         clone_url
     };
 
