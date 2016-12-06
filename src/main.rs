@@ -135,7 +135,7 @@ fn ensure_app_dir(opts: &Options) {
     }
 
     // If the first run is interactive, display a warning about executing untrusted code.
-    if isatty::stdout_isatty() && !opts.quiet() {
+    if isatty::stderr_isatty() && !opts.quiet() {
         trace!("Displaying warning about executing untrusted code...");
         let should_continue = display_warning();
         if !should_continue {

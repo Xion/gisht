@@ -169,6 +169,9 @@ fn resolve_gist(gist: &Gist) -> io::Result<Cow<Gist>> {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData, format!("Invalid GitHub gist: {}", gist.uri)));
         }
+        // TODO: this will always get through the entire list of user's gist,
+        // possibly making HTTP requests to GitHub API multiple times,
+        // and possibly needlessly; make a GistIterator which does the gist listing lazily
         let gists = list_gists(&gist.uri.owner);
         match gists.into_iter().find(|g| gist.uri == g.uri) {
             Some(gist) => Ok(Cow::Owned(gist)),
@@ -398,7 +401,7 @@ fn ensure_github_gist(gist: &Gist) -> io::Result<()> {
     Ok(())
 }
 
-/// Read HTTP response from hype and parse it as JSON.
+/// Read HTTP response from hyper and parse it as JSON.
 fn read_json(response: &mut Response) -> Json {
     let mut body = match response.headers.get::<ContentLength>() {
         Some(&ContentLength(l)) => String::with_capacity(l as usize),

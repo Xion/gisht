@@ -197,7 +197,7 @@ mod tests {
             for cmd in COMMON_INTERPRETERS.values() {
                 let final_cmd = cmd.to_owned()
                     .replace("${script}", "foo")
-                    .replace("${args}", "bar \"baz thud\"");
+                    .replace("${args}", r#"bar "baz thud" qux"#);
                 let cmd_argv = shlex::split(&final_cmd);
 
                 assert!(cmd_argv.is_some(),

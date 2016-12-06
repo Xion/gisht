@@ -128,7 +128,7 @@ pub enum UriError {
 }
 
 impl Error for UriError {
-    fn description(&self) -> &str { "gist URI error"}
+    fn description(&self) -> &str { "gist URI error" }
     fn cause(&self) -> Option<&Error> { None }
 }
 
@@ -146,11 +146,17 @@ impl fmt::Display for UriError {
 mod tests {
     use std::str::FromStr;
     use hosts::DEFAULT_HOST_ID;
-    use super::Uri;
+    use super::{Uri, UriError};
 
     #[test]
     fn parse_empty() {
-        assert!(Uri::from_str("").is_err(), "Empty URI unexpectedly parsed");
+        let result = Uri::from_str("");
+        assert!(result.is_err(), "Empty URI unexpectedly parsed");
+        match result.unwrap_err() {
+            UriError::Malformed(s) =>
+                assert_eq!("", s, "Error from parsing empty URI didn't include the URI"),
+            e@_ => panic!("Unexpected error parsing empty URI: {:?}", e),
+        }
     }
 
     #[test]
@@ -185,7 +191,14 @@ mod tests {
 
     #[test]
     fn parse_invalid_host() {
-        assert!(Uri::from_str("totally_unknown_host:foo").is_err(),
+        let result = Uri::from_str("totally_unknown_host:foo");
+        assert!(result.is_err(),
             "Gist URI with unknown host unexpectedly parsed");
+        match result.unwrap_err() {
+            UriError::UnknownHost(host) =>
+                assert_eq!("totally_unknown_host", host,
+                    "Parse error for gist URI with unknown host didn't mention the host"),
+            e@_ => panic!("Unexpected error when parsing gist URI with invalid host: {:?}", e),
+        }
     }
 }
