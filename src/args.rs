@@ -88,9 +88,9 @@ fn get_matches_with_completion<'a, 'p, I, T>(parser: Parser<'p>, argv: I) -> Res
     // If the completion flag was present, generate the scripts to stdout
     // and quit immediately.
     if let Some(shell) = matches.value_of(OPT_COMPLETION) {
+        let shell = shell.parse::<Shell>().unwrap();
         debug!("Printing autocompletion script for {}...", shell);
-        create_full_parser()
-            .gen_completions_to(APP_NAME, shell.parse::<Shell>().unwrap(), &mut io::stdout());
+        create_full_parser().gen_completions_to(APP_NAME, shell, &mut io::stdout());
         exit(0);
     }
 

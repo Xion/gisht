@@ -91,7 +91,7 @@ impl Host for GitHub {
         for &(datum, field) in INFO_FIELDS {
             result.set(datum, info[field].as_string().unwrap());
         }
-        result.set(Datum::Owner, info["owner"]["login"].as_string().unwrap());
+        result.set(Datum::Owner, info["owner"]["login"].as_string().unwrap_or(ANONYMOUS));
         Ok(Some(result.build()))
     }
 
@@ -104,10 +104,9 @@ impl Host for GitHub {
             None => return None,
         };
 
-        // Obtain gist information using GitHub API and use it construct the gist URI.
-        // TODO: owner is actually optional (URL returned by GitHub API doesn't have it, for example).
-        // handle this; we'll need to get the owner from gist info
-        let owner = captures.name("owner").unwrap();
+        // Obtain gist information using GitHub API.
+        // Note that gist owner may be in the URL already, or we may need to get it
+        // from gist info along with gist name.
         let id = captures.name("id").unwrap();
         let info = try_some!(get_gist_info(id));
         let name = match gist_name_from_info(&info) {
@@ -117,6 +116,9 @@ impl Host for GitHub {
                 return None;
             },
         };
+        let owner = captures.name("owner").unwrap_or_else(|| {
+            info["owner"]["login"].as_string().unwrap_or(ANONYMOUS)
+        });
 
         // Fetch the gist and return it.
         let uri = gist::Uri::new(ID, owner, name).unwrap();
@@ -132,9 +134,14 @@ const HTML_URL: &'static str = "https://gist.github.com";
 lazy_static! {
     /// Regular expression for parsing URLs to gist HTML pages.
     static ref HTML_URL_RE: Regex = Regex::new(
-        &format!("{}{}", regex::quote(HTML_URL), r#"/(?P<owner>[^/]+)/(?P<id>\d+)"#)
+        &format!("{}{}", regex::quote(HTML_URL), r#"/((?P<owner>[^/]+)/)?(?P<id>\d+)"#)
     ).unwrap();
 }
+
+/// "Owner" of anonymous gists.
+/// GitHub makes these URLs equivalent and pointing to the same gist:
+/// https://gist.github.com/anonymous/42 and https://gist.github.com/42
+const ANONYMOUS: &'static str = "anonymous";
 
 
 // Fetching gists
@@ -420,18 +427,20 @@ mod tests {
     fn html_url_regex() {
         lazy_static! {
             static ref VALID_HTML_URLS: Vec<(/* URL */   String,
-                                             /* owner */ &'static str,
+                                             /* owner */ Option<&'static str>,
                                              /* ID */    &'static str)> = vec![
-                (HTML_URL.to_owned() + "/foo/123456", "foo", "123456"),
-                (HTML_URL.to_owned() + "/Xion/67424258", "Xion", "67424258"),
-                (HTML_URL.to_owned() + "/octo-cat/125783657823653178", "octo-cat", "125783657823653178"),
-                (HTML_URL.to_owned() + "/a/1", "a", "1"),
+                (HTML_URL.to_owned() + "/foo/123456", Some("foo"), "123456"),
+                (HTML_URL.to_owned() + "/Xion/67424258", Some("Xion"), "67424258"),
+                (HTML_URL.to_owned() + "/octo-cat/125783657823653178", Some("octo-cat"), "125783657823653178"),
+                (HTML_URL.to_owned() + "/a/1", Some("a"), "1"),
+                (HTML_URL.to_owned() + "/42", None, "42"),
             ];
             static ref INVALID_HTML_URLS: Vec<String> = vec![
                 HTML_URL.to_owned() + "/a/b/c",         // too many path segments
                 HTML_URL.to_owned() + "/a/b1",          // ID must be a number
                 HTML_URL.to_owned() + "/a",             // ID must be provided
                 HTML_URL.to_owned() + "//1",            // owner must not be empty
+                HTML_URL.to_owned() + "/",              // no owner nor ID
                 "http://github.com/Xion/gisht".into(),  // wrong GitHub domain
                 "http://example.com/foo/bar".into(),    // wrong domain altogether
                 "foobar".into(),                        // not even an URL
@@ -440,10 +449,10 @@ mod tests {
         for &(ref valid_url, owner, id) in &*VALID_HTML_URLS {
             let captures = HTML_URL_RE.captures(valid_url)
                 .expect(&format!("Gist HTML URL was incorrectly deemed invalid: {}", valid_url));
-            assert_eq!(owner, captures.name("owner").unwrap());
+            assert_eq!(owner, captures.name("owner"));
             assert_eq!(id, captures.name("id").unwrap());
         }
-        for ref invalid_url in &*INVALID_HTML_URLS {
+        for invalid_url in &*INVALID_HTML_URLS {
             assert!(!HTML_URL_RE.is_match(invalid_url),
                 "URL was incorrectly deemed a valid gist HTML URL: {}", invalid_url);
         }
