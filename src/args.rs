@@ -120,6 +120,7 @@ pub struct Options {
     pub gist_args: Option<Vec<String>>,
 }
 
+#[allow(dead_code)]
 impl Options {
     #[inline]
     pub fn verbose(&self) -> bool { self.verbosity > 0 }

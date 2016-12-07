@@ -77,7 +77,8 @@ impl Host for GitHub {
         try!(ensure_github_gist(gist));
         let gist = try!(resolve_gist(gist));
 
-        let info = try!(get_gist_info(gist.id.as_ref().unwrap()));
+        let id = gist.id.as_ref().unwrap();
+        let info = try!(get_gist_info(id));
 
         // Build the gist::Info structure from known keys in the gist info JSON.
         const INFO_FIELDS: &'static [(Datum, &'static str)] = &[
@@ -89,7 +90,10 @@ impl Host for GitHub {
         ];
         let mut result = gist::InfoBuilder::new();
         for &(datum, field) in INFO_FIELDS {
-            result.set(datum, info[field].as_string().unwrap());
+            match info[field].as_string() {
+                Some(value) => { result.set(datum, value); },
+                None => { warn!("Missing info key '{}' for gist ID={}", field, id); },
+            }
         }
         result.set(Datum::Owner, info["owner"]["login"].as_string().unwrap_or(ANONYMOUS));
         Ok(Some(result.build()))
@@ -97,17 +101,21 @@ impl Host for GitHub {
 
     /// Return a Gist based on URL to its URL page.
     fn resolve_url(&self, url: &str) -> Option<io::Result<Gist>> {
-        // TODO: add more logging here
-
+        trace!("Checking if {} is a GitHub gist URL", url);
         let captures = match HTML_URL_RE.captures(url) {
             Some(c) => c,
-            None => return None,
+            None => {
+                debug!("URL {} doesn't point to a GitHub gist", url);
+                return None;
+            },
         };
+
+        let id = captures.name("id").unwrap();
+        debug!("URL {} points to a GitHub gist: ID={}", url, id);
 
         // Obtain gist information using GitHub API.
         // Note that gist owner may be in the URL already, or we may need to get it
         // from gist info along with gist name.
-        let id = captures.name("id").unwrap();
         let info = try_some!(get_gist_info(id));
         let name = match gist_name_from_info(&info) {
             Some(name) => name,
