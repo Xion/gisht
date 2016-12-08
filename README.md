@@ -4,7 +4,25 @@ Gists in the shell
 
 ## Usage
 
-TBD
+    gisht [OPTIONS] [SUBCOMMAND]
+    
+    OPTIONS:
+        -c, --cached     Operate only on gists available locally
+        -f, --fetch      Always fetch the gist from a remote host
+        -v, --verbose    Increase logging verbosity
+        -q, --quiet      Decrease logging verbosity
+        -H, --help       Prints help information
+        -V, --version    Prints version information
+    
+    SUBCOMMANDS:
+        run      Run the specified gist
+        which    Output the path to gist's binary
+        print    Print the source code of gist's binary
+        open     Open the gist's webpage
+        info     Display summary information about the gist
+        help     Prints this message or the help of the given subcommand(s)
+    
+    Hint: `gisht run GIST` can be shortened to just `gisht GIST`.
 
 ## Development
 

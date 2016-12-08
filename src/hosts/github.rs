@@ -52,6 +52,9 @@ impl Host for GitHub {
         let gist = try!(resolve_gist(gist));
 
         if gist.is_local() {
+            // XXX: needs_update() is actually screwing up with the --remote flag;
+            // we either need to remove it, or make sure a gist is non-local (basically delete its files)
+            // if --remote is passed, prior to invoking Host::fetch_gist
             if needs_update(&gist) {
                 try!(update_gist(gist));
             }
