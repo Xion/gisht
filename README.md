@@ -2,6 +2,16 @@
 
 Gists in the shell
 
+[![Build Status](https://img.shields.io/travis/Xion/gisht.svg)](https://travis-ci.org/Xion/gisht)
+[![License](https://img.shields.io/github/license/Xion/gisht.svg)](https://github.com/Xion/gisht/blob/master/LICENSE)
+
+With *gisht*, you can run scripts published as GitHub gists with a single command::
+
+    gisht Xion/git-today
+
+Behind the scenes, *gisht* will fetch the gist, cache it locally, and run its code.
+Magic!
+
 ## Usage
 
     gisht [OPTIONS] [SUBCOMMAND]
@@ -23,6 +33,9 @@ Gists in the shell
         help     Prints this message or the help of the given subcommand(s)
     
     Hint: `gisht run GIST` can be shortened to just `gisht GIST`.
+    If you want to pass arguments, put them after `--` (two dashes), like this:
+    
+    	gisht Octocat/greet -- "Hello world" --cheerful
 
 ## Development
 

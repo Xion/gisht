@@ -349,7 +349,10 @@ fn create_full_parser<'p>() -> Parser<'p> {
             .about("Display summary information about the gist")
             .arg(gist_arg("Gist to display info on")))
 
-        .after_help("Hint: `gisht run GIST` can be shortened to just `gisht GIST`.")
+        .after_help(
+            "Hint: `gisht run GIST` can be shortened to just `gisht GIST`.\n\
+            If you want to pass arguments, put them after `--` (two dashes), like this:\n\n\
+            \tgisht Octocat/greet -- \"Hello world\" --cheerful")
 }
 
 /// Create the "base" argument parser object.
