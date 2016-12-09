@@ -20,7 +20,7 @@ MIN_RUSTC_VERSION = '1.12.0'
 
 def ensure_rustc_version(ctx):
     """Terminates the build unless the Rust compiler is recent enough."""
-    rustc_v = ctx.run('rustc --version', hide=True)
+    rustc_v = ctx.run('rustc --version', hide=True, warn=True)
     if not rustc_v.ok:
         logging.critical("Rust compiler not found, aborting build.")
         sys.exit(rustc_v.return_code)

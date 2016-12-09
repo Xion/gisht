@@ -18,8 +18,6 @@ import sys
 from invoke import task
 import toml
 
-from tasks.util import cargo
-
 
 # Package information.
 #
@@ -85,7 +83,8 @@ def prepare_release(ctx):
 
     This includes building the binary in --release mode.
     """
-    cargo(ctx, 'build', '--release', '--color', 'always')
+    from tasks import build
+    build.all(ctx, release=True)
 
     if which(ctx, 'strip'):
         ctx.run('strip %s' % (SOURCE_DIR / BIN))
