@@ -49,6 +49,8 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::exit;
 
+use ansi_term::{Colour, Style};
+
 use args::{ArgsError, Command, GistArg, Locality, Options};
 use commands::{run_gist, print_binary_path, print_gist, open_gist, show_gist_info};
 use gist::Gist;
@@ -220,8 +222,20 @@ fn gist_from_url(url: &str) -> Option<Gist> {
 /// Display warning about executing untrusted code and ask the user to continue.
 /// Returns whether the user decided to continue.
 fn display_warning() -> bool {
+    writeln!(&mut io::stderr(), "{}", format_warning_message()).unwrap();
+
+    write!(&mut io::stderr(), "{}", format_warning_ack_prompt()).unwrap();
+    let mut answer = String::with_capacity(YES.len());
+    io::stdin().read_line(&mut answer).unwrap();
+
+    answer.trim().to_lowercase() == YES
+}
+
+/// Return the formatted warning message, incl. coloring if the terminal supports it.
+fn format_warning_message() -> String {
+    const PREFIX: &'static str = "WARNING";
     const WARNING: &'static [&'static str] = &[
-        "WARNING: gisht is used to download & run code from a remote source.",
+        "gisht is used to download & run code from a remote source.",
         "",
         "Never run gists that you haven't authored, and/or do not trust.",
         "Doing so is dangerous, and may expose your system to security risks!",
@@ -229,11 +243,20 @@ fn display_warning() -> bool {
         "(If you continue, this warning won't be shown again).",
         "",
     ];
-    writeln!(&mut io::stderr(), "{}", WARNING.join(util::LINESEP)).unwrap();
-
-    write!(&mut io::stderr(), "{}", "Do you want to continue? [y/N]: ").unwrap();
-    let mut answer = String::with_capacity(1);
-    io::stdin().read_line(&mut answer).unwrap();
-
-    answer.trim().to_lowercase() == "y"
+    let prefix_style =
+        if cfg!(unix) { Colour::Yellow.bold() } else { Style::default() };
+    format!("{}: {}", prefix_style.paint(PREFIX), WARNING.join(util::LINESEP))
 }
+
+/// Return the formatted prompt for warning acknowledgment.
+fn format_warning_ack_prompt() -> String {
+    const ACK_PROMPT: &'static str = "Do you wish to continue?";
+    if cfg!(unix) {
+        format!("{} [{}/{}]: ", Style::new().bold().paint(ACK_PROMPT),
+            YES, Colour::Green.paint("N"))
+    } else {
+        format!("{} [{}/{}]: ", ACK_PROMPT, YES, "N")
+    }
+}
+
+const YES: &'static str = "y";
