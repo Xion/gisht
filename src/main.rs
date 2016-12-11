@@ -17,7 +17,7 @@
              extern crate shlex;
              extern crate slog_envlogger;
              extern crate slog_stdlog;
-             extern crate slog_term;
+             extern crate slog_stream;
              extern crate time;
              extern crate url;
              extern crate webbrowser;

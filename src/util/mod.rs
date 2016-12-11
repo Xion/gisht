@@ -10,7 +10,7 @@ use std::path::Path;
 macro_rules! try_some {
     ($ex:expr) => (match $ex {
         Ok(value) => value,
-        Err(error) => return Some(Err(error)),
+        Err(error) => return Some(Err(error.into())),
     })
 }
 

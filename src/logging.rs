@@ -1,14 +1,22 @@
 //! Module implementing logging for the application.
+//!
+//! This includes setting up log filtering given a verbosity value,
+//! as well as defining how the logs are being formatted to stderr.
 
 use std::env;
+use std::io;
 
 use log::SetLoggerError;
-use slog::{self, DrainExt, FilterLevel};
+use slog::{self, DrainExt, FilterLevel, Level};
 use slog_envlogger::LogBuilder;
 use slog_stdlog;
-use slog_term;
+use slog_stream;
+use time;
 
 
+// Default logging level defined using the two enums used by slog.
+// Both values must correspond to the same level. (This is checked by a test).
+const DEFAULT_LEVEL: Level = Level::Info;
 const DEFAULT_FILTER_LEVEL: FilterLevel = FilterLevel::Info;
 
 // Arrays of log levels, indexed by verbosity.
@@ -29,10 +37,7 @@ const NEGATIVE_VERBOSITY_LEVELS: &'static [FilterLevel] = &[
 /// Initialize logging with given verbosity.
 /// The verbosity value has the same meaning as in args::Options::verbosity.
 pub fn init(verbosity: isize) -> Result<(), SetLoggerError> {
-    // TODO: use slog_stream crate to better control log formatting;
-    // example: https://github.com/slog-rs/misc/blob/master/examples/global_file_logger.rs
-    let stderr = slog_term::streamer().sync().stderr()
-        .use_custom_timestamp(move |io| write!(io, ""));  // No log timestamps.
+    let stderr = slog_stream::stream(io::stderr(), LogFormat);
 
     // Determine the log filtering level based on verbosity.
     // If the argument is excessive, log that but clamp to the highest/lowest log level.
@@ -54,7 +59,7 @@ pub fn init(verbosity: isize) -> Result<(), SetLoggerError> {
     };
 
     // Include universal logger options, like the level.
-    let mut builder = LogBuilder::new(stderr.build());
+    let mut builder = LogBuilder::new(stderr);
     builder = builder.filter(None, level);
 
     // Make some of the libraries less chatty.
@@ -81,10 +86,57 @@ pub fn init(verbosity: isize) -> Result<(), SetLoggerError> {
 }
 
 
+/// Token type that's only uses to tell slog-stream how to format our log entries.
+struct LogFormat;
+
+impl slog_stream::Format for LogFormat {
+    /// Format a single log Record and write it to given output.
+    fn format(&self, output: &mut io::Write,
+              record: &slog::Record,
+              _logger_kvp: &slog::OwnedKeyValueList) -> io::Result<()> {
+        // Format the higher level (more fine-grained) messages with greater detail,
+        // as they are only visible when user explicitly enables verbose logging.
+        let msg = if record.level() > DEFAULT_LEVEL {
+            let now = time::now();
+            let logtime = now.rfc3339();  // E.g.: 2012-02-22T07:53:18-07:00
+            format!("{}{} {}#{}] {}\n",
+                format_log_level(record.level()), logtime,
+                record.module(), record.line(),
+                record.msg())
+        } else {
+            // TODO: colorize the output (especially the level part)
+            // if output is a TTY (which can be passed via logger_kvp)
+            format!("{}: {}\n", record.level().as_str(), record.msg())
+        };
+
+        try!(output.write_all(msg.as_bytes()));
+        Ok(())
+    }
+}
+
+/// Format the log level string.
+fn format_log_level(level: Level) -> String {
+    let level = level.as_str();
+    let first_char = level.chars().next().unwrap();
+    first_char.to_uppercase().collect()
+}
+
+
 #[cfg(test)]
 mod tests {
     use slog::FilterLevel;
-    use super::{NEGATIVE_VERBOSITY_LEVELS, POSITIVE_VERBOSITY_LEVELS};
+    use super::{DEFAULT_LEVEL, DEFAULT_FILTER_LEVEL,
+                NEGATIVE_VERBOSITY_LEVELS, POSITIVE_VERBOSITY_LEVELS};
+
+    /// Check that default logging level is defined consistently.
+    #[test]
+    fn default_level() {
+        let level = DEFAULT_LEVEL.as_usize();
+        let filter_level = DEFAULT_FILTER_LEVEL.as_usize();
+        assert_eq!(level, filter_level,
+            "Default logging level is defined inconsistently: Level::{:?} vs. FilterLevel::{:?}",
+            DEFAULT_LEVEL, DEFAULT_FILTER_LEVEL);
+    }
 
     #[test]
     fn verbosity_levels() {
