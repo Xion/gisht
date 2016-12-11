@@ -135,6 +135,7 @@ lazy_static! {
     // (Level doesn't implement Hash so it has to be usize).
     static ref TTY_LEVEL_STYLES: HashMap<usize, Style> = hashmap!{
         Level::Info.as_usize() => Colour::Green.normal(),
+        Level::Warning.as_usize() => Colour::Yellow.normal(),
         Level::Error.as_usize() => Colour::Red.normal(),
         Level::Critical.as_usize() => Colour::Purple.normal(),
     };
