@@ -103,8 +103,7 @@ impl slog_stream::Format for LogFormat {
         // Format the higher level (more fine-grained) messages with greater detail,
         // as they are only visible when user explicitly enables verbose logging.
         let msg = if record.level() > DEFAULT_LEVEL {
-            let now = time::now();
-            let logtime = now.rfc3339();  // E.g.: 2012-02-22T07:53:18-07:00
+            let logtime = format_log_time();
             let level: String = {
                 let first_char = record.level().as_str().chars().next().unwrap();
                 first_char.to_uppercase().collect()
@@ -129,6 +128,19 @@ impl slog_stream::Format for LogFormat {
         Ok(())
     }
 }
+
+/// Format the timestamp part of a detailed log entry.
+fn format_log_time() -> String {
+    let utc_now = time::now().to_utc();
+    let mut logtime = format!("{}", utc_now.rfc3339());  // E.g.: 2012-02-22T14:53:18Z
+
+    // Insert millisecond count before the Z.
+    let millis = utc_now.tm_nsec / NANOS_IN_MILLISEC;
+    logtime.pop();
+    format!("{}.{:04}Z", logtime, millis)
+}
+
+const NANOS_IN_MILLISEC: i32 = 1000000;
 
 lazy_static! {
     /// Map of log levels to their ANSI terminal styles.
