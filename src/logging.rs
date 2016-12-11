@@ -3,9 +3,13 @@
 //! This includes setting up log filtering given a verbosity value,
 //! as well as defining how the logs are being formatted to stderr.
 
+use std::borrow::Cow;
+use std::collections::HashMap;
 use std::env;
 use std::io;
 
+use ansi_term::{Colour, Style};
+use isatty;
 use log::SetLoggerError;
 use slog::{self, DrainExt, FilterLevel, Level};
 use slog_envlogger::LogBuilder;
@@ -86,6 +90,8 @@ pub fn init(verbosity: isize) -> Result<(), SetLoggerError> {
 }
 
 
+// Log formatting
+
 /// Token type that's only uses to tell slog-stream how to format our log entries.
 struct LogFormat;
 
@@ -99,14 +105,24 @@ impl slog_stream::Format for LogFormat {
         let msg = if record.level() > DEFAULT_LEVEL {
             let now = time::now();
             let logtime = now.rfc3339();  // E.g.: 2012-02-22T07:53:18-07:00
+            let level: String = {
+                let first_char = record.level().as_str().chars().next().unwrap();
+                first_char.to_uppercase().collect()
+            };
             format!("{}{} {}#{}] {}\n",
-                format_log_level(record.level()), logtime,
-                record.module(), record.line(),
-                record.msg())
+                level, logtime, record.module(), record.line(), record.msg())
         } else {
-            // TODO: colorize the output (especially the level part)
-            // if output is a TTY (which can be passed via logger_kvp)
-            format!("{}: {}\n", record.level().as_str(), record.msg())
+            // Colorize the level label if we're outputting to a Unix terminal.
+            let istty = cfg!(unix) && isatty::stderr_isatty();
+            let level: Cow<str> = if istty {
+                let style = TTY_LEVEL_STYLES.get(&record.level().as_usize())
+                    .cloned()
+                    .unwrap_or_else(Style::default);
+                Cow::Owned(format!("{}", style.paint(record.level().as_str())))
+            } else {
+                Cow::Borrowed(record.level().as_str())
+            };
+            format!("{}: {}\n", level, record.msg())
         };
 
         try!(output.write_all(msg.as_bytes()));
@@ -114,11 +130,14 @@ impl slog_stream::Format for LogFormat {
     }
 }
 
-/// Format the log level string.
-fn format_log_level(level: Level) -> String {
-    let level = level.as_str();
-    let first_char = level.chars().next().unwrap();
-    first_char.to_uppercase().collect()
+lazy_static! {
+    /// Map of log levels to their ANSI terminal styles.
+    // (Level doesn't implement Hash so it has to be usize).
+    static ref TTY_LEVEL_STYLES: HashMap<usize, Style> = hashmap!{
+        Level::Info.as_usize() => Colour::Green.normal(),
+        Level::Error.as_usize() => Colour::Red.normal(),
+        Level::Critical.as_usize() => Colour::Purple.normal(),
+    };
 }
 
 

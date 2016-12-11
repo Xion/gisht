@@ -2,6 +2,7 @@
 //! gisht -- Gists in the shell
 //!
 
+             extern crate ansi_term;
              extern crate clap;
              extern crate conv;
 #[macro_use] extern crate custom_derive;
