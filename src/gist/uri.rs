@@ -155,7 +155,7 @@ mod tests {
         match result.unwrap_err() {
             UriError::Malformed(s) =>
                 assert_eq!("", s, "Error from parsing empty URI didn't include the URI"),
-            e@_ => panic!("Unexpected error parsing empty URI: {:?}", e),
+            e => panic!("Unexpected error parsing empty URI: {:?}", e),
         }
     }
 
@@ -198,7 +198,7 @@ mod tests {
             UriError::UnknownHost(host) =>
                 assert_eq!("totally_unknown_host", host,
                     "Parse error for gist URI with unknown host didn't mention the host"),
-            e@_ => panic!("Unexpected error when parsing gist URI with invalid host: {:?}", e),
+            e => panic!("Unexpected error when parsing gist URI with invalid host: {:?}", e),
         }
     }
 }

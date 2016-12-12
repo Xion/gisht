@@ -145,7 +145,7 @@ const HTML_URL: &'static str = "https://gist.github.com";
 lazy_static! {
     /// Regular expression for parsing URLs to gist HTML pages.
     static ref HTML_URL_RE: Regex = Regex::new(
-        &format!("{}{}", regex::quote(HTML_URL), r#"/((?P<owner>[^/]+)/)?(?P<id>\d+)"#)
+        &format!("^{}{}$", regex::quote(HTML_URL), r#"/((?P<owner>[^/]+)/)?(?P<id>[0-9a-fA-F]+)"#)
     ).unwrap();
 }
 
@@ -193,7 +193,7 @@ fn resolve_gist(gist: &Gist) -> io::Result<Cow<Gist>> {
         let gists = list_gists(&gist.uri.owner);
         match gists.into_iter().find(|g| gist.uri == g.uri) {
             Some(gist) => Ok(Cow::Owned(gist)),
-            _ => return Err(io::Error::new(
+            _ => Err(io::Error::new(
                 io::ErrorKind::InvalidData, format!("Gist {} not found", gist.uri))),
         }
     }
@@ -442,14 +442,16 @@ mod tests {
                                              /* ID */    &'static str)> = vec![
                 (HTML_URL.to_owned() + "/foo/123456", Some("foo"), "123456"),
                 (HTML_URL.to_owned() + "/Xion/67424258", Some("Xion"), "67424258"),
-                (HTML_URL.to_owned() + "/octo-cat/125783657823653178", Some("octo-cat"), "125783657823653178"),
+                (HTML_URL.to_owned() + "/octo-cat/1e2f57a365d782dd36538", Some("octo-cat"), "1e2f57a365d782dd36538"),
+                (HTML_URL.to_owned() + "/a", None, "a"),
                 (HTML_URL.to_owned() + "/a/1", Some("a"), "1"),
                 (HTML_URL.to_owned() + "/42", None, "42"),
+                (HTML_URL.to_owned() + "/d0f351a97c65679bb911bafe", None, "d0f351a97c65679bb911bafe"),
             ];
             static ref INVALID_HTML_URLS: Vec<String> = vec![
                 HTML_URL.to_owned() + "/a/b/c",         // too many path segments
-                HTML_URL.to_owned() + "/a/b1",          // ID must be a number
-                HTML_URL.to_owned() + "/a",             // ID must be provided
+                HTML_URL.to_owned() + "/a/",            // ID must be provided
+                HTML_URL.to_owned() + "/11yf",          // ID must be a hex number
                 HTML_URL.to_owned() + "//1",            // owner must not be empty
                 HTML_URL.to_owned() + "/",              // no owner nor ID
                 "http://github.com/Xion/gisht".into(),  // wrong GitHub domain
