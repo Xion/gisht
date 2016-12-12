@@ -42,7 +42,7 @@ pub trait Host : Send + Sync {
         Ok(None)
     }
 
-    /// Return a (fetched) gist corresponding to the given URL.
+    /// Return a gist corresponding to the given URL.
     /// The URL will typically point to a user-facing HTML page of the gist.
     ///
     /// Note: The return type of this method is an Option (Option<io::Result<Gist>>)

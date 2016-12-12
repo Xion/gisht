@@ -98,13 +98,16 @@ impl Host for GitHub {
                 None => { warn!("Missing info key '{}' for gist ID={}", field, id); },
             }
         }
-        result.set(Datum::Owner, info["owner"]["login"].as_string().unwrap_or(ANONYMOUS));
+        result.set(Datum::Owner, gist_owner_from_info(&info));
         Ok(Some(result.build()))
     }
 
     /// Return a Gist based on URL to its URL page.
     fn resolve_url(&self, url: &str) -> Option<io::Result<Gist>> {
         trace!("Checking if {} is a GitHub gist URL", url);
+
+        // TODO: trim the URL, change http to https if necessary, etc..
+
         let captures = match HTML_URL_RE.captures(url) {
             Some(c) => c,
             None => {
@@ -127,14 +130,12 @@ impl Host for GitHub {
                 return None;
             },
         };
-        let owner = captures.name("owner").unwrap_or_else(|| {
-            info["owner"]["login"].as_string().unwrap_or(ANONYMOUS)
-        });
+        let owner = captures.name("owner").unwrap_or_else(|| gist_owner_from_info(&info));
 
-        // Fetch the gist and return it.
+        // Return the resolved gist.
         let uri = gist::Uri::new(ID, owner, name).unwrap();
         let gist = Gist::from_uri(uri).with_id(id);
-        try_some!(self.fetch_gist(&gist));
+        trace!("URL resolves to GitHub gist {} (ID={})", gist.uri, gist.id.as_ref().unwrap());
         Some(Ok(gist))
     }
 }
@@ -171,6 +172,7 @@ lazy_static! {
 
 /// Return a "resolved" Gist that has a GitHub ID associated with it.
 fn resolve_gist(gist: &Gist) -> io::Result<Cow<Gist>> {
+    debug!("Resolving GitHub gist: {}", gist.uri);
     let gist = Cow::Borrowed(gist);
     if gist.id.is_some() {
         return Ok(gist);
@@ -392,19 +394,29 @@ fn get_gist_info(gist_id: &str) -> io::Result<Json> {
     Ok(read_json(&mut resp))
 }
 
-/// Retrive gist name from the parsed JSON of gist info.
+/// Retrieve gist name from the parsed JSON of gist info.
 ///
 /// The gist name is defined to be the name of its first file,
 /// as this is how GitHub page itself picks it.
 fn gist_name_from_info(info: &Json) -> Option<&str> {
-    let mut files: Vec<_> = info["files"].as_object().unwrap()
-        .keys().collect();
-    if files.is_empty() {
+    let files = try_opt!(info["files"].as_object());
+    let mut filenames: Vec<_> = files.keys().collect();
+    if filenames.is_empty() {
         None
     } else {
-        files.sort();
-        Some(files[0])
+        filenames.sort();
+        Some(filenames[0])
     }
+}
+
+/// Retrieve gist owner from the parsed JSON of gist info.
+/// This may be an anonymous name.
+fn gist_owner_from_info<'i>(info: &'i Json) -> &'i str {
+    (|| -> Option<&'i str> {
+        let info = try_opt!(info.as_object());
+        let owner = try_opt!(info.get("owner").and_then(|o| o.as_object()));
+        owner.get("login").and_then(|l| l.as_string())
+    })().unwrap_or(ANONYMOUS)
 }
 
 
