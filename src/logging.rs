@@ -117,9 +117,9 @@ impl slog_stream::Format for LogFormat {
                 let style = TTY_LEVEL_STYLES.get(&record.level().as_usize())
                     .cloned()
                     .unwrap_or_else(Style::default);
-                Cow::Owned(format!("{}", style.paint(record.level().as_str())))
+                format!("{}", style.paint(record.level().as_str())).into()
             } else {
-                Cow::Borrowed(record.level().as_str())
+                record.level().as_str().into()
             };
             format!("{}: {}\n", level, record.msg())
         };

@@ -108,12 +108,12 @@ impl Host for GitHub {
 
         // Clean up the URL a little, e.g. by converting HTTP to HTTPS.
         let orig_url = url.to_owned();
-        let url = {
+        let url: Cow<str> = {
             let url = url.trim();
             if url.starts_with("http://") {
-                Cow::Owned(format!("https://{}", url.trim_left_matches("http://")))
+                format!("https://{}", url.trim_left_matches("http://")).into()
             } else {
-                Cow::Borrowed(url)
+                url.into()
             }
         };
 
