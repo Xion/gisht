@@ -104,20 +104,30 @@ impl Host for GitHub {
 
     /// Return a Gist based on URL to its URL page.
     fn resolve_url(&self, url: &str) -> Option<io::Result<Gist>> {
-        trace!("Checking if {} is a GitHub gist URL", url);
+        trace!("Checking if `{}` is a GitHub gist URL", url);
 
-        // TODO: trim the URL, change http to https if necessary, etc..
+        // Clean up the URL a little, e.g. by converting HTTP to HTTPS.
+        let orig_url = url.to_owned();
+        let url = {
+            let url = url.trim();
+            if url.starts_with("http://") {
+                Cow::Owned(format!("https://{}", url.trim_left_matches("http://")))
+            } else {
+                Cow::Borrowed(url)
+            }
+        };
 
-        let captures = match HTML_URL_RE.captures(url) {
+        // Check if it matches the pattern of gist page URLs.
+        let captures = match HTML_URL_RE.captures(&*url) {
             Some(c) => c,
             None => {
-                debug!("URL {} doesn't point to a GitHub gist", url);
+                debug!("URL {} doesn't point to a GitHub gist", orig_url);
                 return None;
             },
         };
 
         let id = captures.name("id").unwrap();
-        debug!("URL {} points to a GitHub gist: ID={}", url, id);
+        debug!("URL {} points to a GitHub gist: ID={}", orig_url, id);
 
         // Obtain gist information using GitHub API.
         // Note that gist owner may be in the URL already, or we may need to get it
@@ -126,7 +136,7 @@ impl Host for GitHub {
         let name = match gist_name_from_info(&info) {
             Some(name) => name,
             None => {
-                warn!("GitHub gist with ID={} (URL={}) has no files", id, url);
+                warn!("GitHub gist with ID={} (URL={}) has no files", id, orig_url);
                 return None;
             },
         };
@@ -412,11 +422,11 @@ fn gist_name_from_info(info: &Json) -> Option<&str> {
 /// Retrieve gist owner from the parsed JSON of gist info.
 /// This may be an anonymous name.
 fn gist_owner_from_info<'i>(info: &'i Json) -> &'i str {
-    (|| -> Option<&'i str> {
+    || -> Option<&'i str> {
         let info = try_opt!(info.as_object());
         let owner = try_opt!(info.get("owner").and_then(|o| o.as_object()));
         owner.get("login").and_then(|l| l.as_string())
-    })().unwrap_or(ANONYMOUS)
+    }().unwrap_or(ANONYMOUS)
 }
 
 
