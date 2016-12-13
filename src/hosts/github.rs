@@ -67,12 +67,21 @@ impl Host for GitHub {
 
     /// Return the URL to gist's HTML website.
     fn gist_url(&self, gist: &Gist) -> io::Result<String> {
-        // TODO: get the URL from GitHub directly ('html_url' field of gist info)
-        // rather than formatting it manually
-        let gist = try!(resolve_gist(gist));
+        debug!("Building URL for {:?}", gist);
+        let gist = if gist.id.is_none() {
+            trace!("Gist {} has no GitHub ID, attempting to resolve", gist.uri);
+            try!(resolve_gist(gist))
+        } else {
+            trace!("Gist {} has ID={}, no need to resolve it for the URL",
+                gist.uri, gist.id.as_ref().unwrap());
+            Cow::Borrowed(gist)
+        };
         let mut url = Url::parse(HTML_URL).unwrap();
         url.set_path(&format!("{}/{}", gist.uri.owner, gist.id.as_ref().unwrap()));
-        Ok(url.into_string())
+
+        let url = url.into_string();
+        trace!("Browser URL for {:?}: {}", gist, url);
+        Ok(url)
     }
 
     /// Return a structure with gist metadata.

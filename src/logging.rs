@@ -6,7 +6,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::env;
-use std::io;
+use std::io::{self, Write};
 
 use ansi_term::{Colour, Style};
 use isatty;
@@ -97,7 +97,7 @@ struct LogFormat;
 
 impl slog_stream::Format for LogFormat {
     /// Format a single log Record and write it to given output.
-    fn format(&self, output: &mut io::Write,
+    fn format(&self, _: &mut io::Write,
               record: &slog::Record,
               _logger_kvp: &slog::OwnedKeyValueList) -> io::Result<()> {
         // Format the higher level (more fine-grained) messages with greater detail,
@@ -124,7 +124,7 @@ impl slog_stream::Format for LogFormat {
             format!("{}: {}\n", level, record.msg())
         };
 
-        try!(output.write_all(msg.as_bytes()));
+        try!(io::stderr().write_all(msg.as_bytes()));
         Ok(())
     }
 }
