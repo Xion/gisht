@@ -2,7 +2,7 @@
 Automation tasks, aided by the Invoke package.
 """
 import logging
-import os
+from pathlib import Path
 import sys
 
 from invoke import Collection, task
@@ -52,7 +52,7 @@ ns.add_collection(release)
 
 
 # This precondition makes it easier to localize files needed by tasks.
-if not os.path.exists(os.path.join(os.getcwd(), '.gitignore')):
+if not Path.cwd().joinpath('.gitignore').exists():
     logging.fatal(
         "Automation tasks can only be invoked from project's root directory!")
     sys.exit(1)

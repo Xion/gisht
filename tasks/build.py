@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from invoke import task
+from invoke.exceptions import Exit
 
 from tasks.util import ensure_rustc_version, cargo, get_cargo_flags
 
@@ -44,7 +45,7 @@ def readme(ctx, release=False, verbose=False):
     if not (binary.ok or binary.return_code == os.EX_USAGE):
         logging.critical("Compiled binary return error code %s; stderr:\n%s",
                          binary.return_code, binary.stderr)
-        return binary.return_code
+        raise Exit(binary.return_code)
     help_lines = binary.stderr.strip().splitlines()
 
     # Beautify it a little before pasting into README.
@@ -74,7 +75,7 @@ def readme(ctx, release=False, verbose=False):
         if begin_idx is None or end_idx is None:
             logging.critical("Usage begin or end markers not found in README "
                              "(begin:%s, end:%s)", begin_idx, end_idx)
-            return 2
+            raise Exit(2)
 
         # Reassemble the modified content of the README, with help inside.
         readme_content = os.linesep.join([

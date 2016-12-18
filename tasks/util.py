@@ -7,8 +7,8 @@ try:
     from shlex import quote
 except ImportError:
     from pipes import quote
-import sys
 
+from invoke.exceptions import Exit
 import semver
 
 
@@ -23,13 +23,13 @@ def ensure_rustc_version(ctx):
     rustc_v = ctx.run('rustc --version', hide=True, warn=True)
     if not rustc_v.ok:
         logging.critical("Rust compiler not found, aborting build.")
-        sys.exit(rustc_v.return_code)
+        raise Exit(rustc_v.return_code)
 
     _, version, _ = rustc_v.stdout.split(None, 2)
     if not semver.match(version, '>=' + MIN_RUSTC_VERSION):
         logging.error("Build requires at least Rust %s, found %s",
                       MIN_RUSTC_VERSION, version)
-        sys.exit(1)
+        raise Exit(1)
 
     return True
 

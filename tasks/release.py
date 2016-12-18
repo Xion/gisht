@@ -13,9 +13,9 @@ try:
     from shlex import quote
 except ImportError:
     from pipes import quote
-import sys
 
 from invoke import task
+from invoke.exceptions import Exit
 import toml
 
 
@@ -66,7 +66,7 @@ def rpm(ctx):
     ensure_fpm(ctx)
     if not which(ctx, 'rpm'):
         logging.warning("`rpm` not found, cannot create RedHat package.")
-        return 1
+        return False
 
     ensure_output_dir()
     prepare_release(ctx)
@@ -102,7 +102,7 @@ def ensure_output_dir():
     if not OUTPUT_DIR.is_dir():
         logging.error("Output path %s already exists but it's not a directory!",
                       OUTPUT_DIR)
-        sys.exit(2)
+        raise Exit(2)
 
     try:
         logging.info("Creating output directory (%s)...", OUTPUT_DIR)
@@ -110,7 +110,7 @@ def ensure_output_dir():
     except IOError as e:
         logging.fatal("Failed to create output directory %s: %s",
                       OUTPUT_DIR, e)
-        sys.exit(2)
+        raise Exit(2)
     else:
         logging.debug("Output directory created.")
 
@@ -183,7 +183,7 @@ def ensure_fpm(ctx):
     """Ensure that fpm is available."""
     if not which(ctx, 'fpm'):
         logging.fatal("fpm not found, aborting.")
-        sys.exit(1)
+        raise Exit(1)
 
 
 def which(ctx, prog):
