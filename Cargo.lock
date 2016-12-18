@@ -22,7 +22,6 @@ dependencies = [
  "slog-stdlog 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-stream 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)",
- "try_opt 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "webbrowser 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -568,11 +567,6 @@ version = "0.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "try_opt"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
 name = "typeable"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -718,7 +712,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum thread_local 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "8576dbbfcaef9641452d5cf0df9b0e7eeab7694956dd33bb61515fb8f18cfdd5"
 "checksum time 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)" = "3c7ec6d62a20df54e07ab3b78b9a3932972f4b7981de295563686849eb3989af"
 "checksum traitobject 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "07eaeb7689bb7fca7ce15628319635758eda769fed481ecfe6686ddef2600616"
-"checksum try_opt 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d30b71e7ba40551f9873f3ba9f4ee36f16015adf0962aba57caf403088370db1"
 "checksum typeable 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1410f6f91f21d1612654e7cc69193b0334f909dcf2c790c4826254fbb86f8887"
 "checksum unicase 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "13a5906ca2b98c799f4b1ab4557b76367ebd6ae5ef14930ec841c74aed5f3764"
 "checksum unicode-bidi 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "c1f7ceb96afdfeedee42bade65a0d585a6a0106f681b6749c8ff4daa8df30b3f"

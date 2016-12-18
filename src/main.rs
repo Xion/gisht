@@ -20,7 +20,6 @@
              extern crate slog_stdlog;
              extern crate slog_stream;
              extern crate time;
-#[macro_use] extern crate try_opt;
              extern crate url;
              extern crate webbrowser;
 

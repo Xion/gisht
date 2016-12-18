@@ -102,7 +102,7 @@ impl Host for GitHub {
         ];
         let mut result = gist::InfoBuilder::new();
         for &(datum, field) in INFO_FIELDS {
-            match info[field].as_string() {
+            match info.find(field).and_then(|f| f.as_string()) {
                 Some(value) => { result.set(datum, value); },
                 None => { warn!("Missing info key '{}' for gist ID={}", field, id); },
             }
@@ -418,24 +418,23 @@ fn get_gist_info(gist_id: &str) -> io::Result<Json> {
 /// The gist name is defined to be the name of its first file,
 /// as this is how GitHub page itself picks it.
 fn gist_name_from_info(info: &Json) -> Option<&str> {
-    let files = try_opt!(info["files"].as_object());
-    let mut filenames: Vec<_> = files.keys().collect();
-    if filenames.is_empty() {
-        None
-    } else {
-        filenames.sort();
-        Some(filenames[0])
-    }
+    info.find("files").and_then(|fs| fs.as_object()).and_then(|files| {
+        let mut filenames: Vec<_> = files.keys().map(|s| s as &str).collect();
+        if filenames.is_empty() {
+            None
+        } else {
+            filenames.sort();
+            Some(filenames[0])
+        }
+    })
 }
 
 /// Retrieve gist owner from the parsed JSON of gist info.
 /// This may be an anonymous name.
-fn gist_owner_from_info<'i>(info: &'i Json) -> &'i str {
-    || -> Option<&'i str> {
-        let info = try_opt!(info.as_object());
-        let owner = try_opt!(info.get("owner").and_then(|o| o.as_object()));
-        owner.get("login").and_then(|l| l.as_string())
-    }().unwrap_or(ANONYMOUS)
+fn gist_owner_from_info(info: &Json) -> &str {
+    info.find_path(&["owner", "login"])
+        .and_then(|l| l.as_string())
+        .unwrap_or(ANONYMOUS)
 }
 
 
