@@ -13,7 +13,11 @@ matrix:
   allow_failures:
     - rust: nightly
 
+addons:
+  apt:
+    packages:
+      - cmake
+
 # Run the tests.
 # TODO: make Travis run Invoke tasks instead
 script: cargo test --no-fail-fast
-sudo: false
