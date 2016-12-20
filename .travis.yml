@@ -1,0 +1,19 @@
+language: rust
+
+rust:
+  - nightly
+  - beta
+  - stable
+os:
+  - linux
+  - osx
+
+# Test on nightly Rust, but failures there won't break the build.
+matrix:
+  allow_failures:
+    - rust: nightly
+
+# Run the tests.
+# TODO: make Travis run Invoke tasks instead
+script: cargo test --no-fail-fast
+sudo: false
