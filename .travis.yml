@@ -13,6 +13,11 @@ matrix:
   allow_failures:
     - rust: nightly
 
+#
+# Dependencies
+#
+
+# Linux
 addons:
   apt:
     sources:
@@ -20,6 +25,17 @@ addons:
     packages:
       - cmake
 
-# Run the tests.
+# OSX
+before_install: |
+  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+    brew update
+    brew install openssl
+    brew install cmake
+  fi
+
+#
+# Test script
+#
+
 # TODO: make Travis run Invoke tasks instead
 script: cargo test --no-fail-fast
