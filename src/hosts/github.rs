@@ -4,7 +4,6 @@
 //! NOT the actual GitHub repository hosting.
 
 use std::borrow::Cow;
-use std::collections::HashSet;
 use std::fs;
 use std::io::{self, Read};
 use std::iter::Iterator;
@@ -209,11 +208,7 @@ fn resolve_gist(gist: &Gist) -> io::Result<Cow<Gist>> {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData, format!("Invalid GitHub gist: {}", gist.uri)));
         }
-        // TODO: this will always get through the entire list of user's gist,
-        // possibly making HTTP requests to GitHub API multiple times,
-        // and possibly needlessly; make a GistIterator which does the gist listing lazily
-        let gists = list_gists(&gist.uri.owner);
-        match gists.into_iter().find(|g| gist.uri == g.uri) {
+        match iter_gists(&gist.uri.owner).find(|g| gist.uri == g.uri) {
             Some(gist) => Ok(Cow::Owned(gist)),
             _ => Err(io::Error::new(
                 io::ErrorKind::InvalidData, format!("Gist {} not found", gist.uri))),
@@ -308,6 +303,9 @@ fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
     // Talk to GitHub to obtain the URL that we can clone the gist from
     // as a Git repository.
     let clone_url = {
+        // TODO: when iterating over GitHub gist, we'll actually get the clone URL
+        // in the /gists rsponse JSON, but drop it; add a metadata to Gist where
+        // it could be saved & reused here, w/o requesting gist info again
         let info = try!(get_gist_info(&gist.id.as_ref().unwrap()));
         let clone_url = info["git_pull_url"].as_string().unwrap().to_owned();
         trace!("GitHub gist #{} has a git_pull_url=\"{}\"",
@@ -336,18 +334,10 @@ fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
 }
 
 
-/// Get all GitHub gists belonging to a given owner.
-fn list_gists(owner: &str) -> Vec<Gist> {
-    let mut result = HashSet::new();
-    for gist in GistsIterator::new(owner) {
-        let name = gist.uri.name.clone();
-        if !result.insert(gist) {
-            // TODO: find a way to warn the user about this ambiguity
-            warn!("GitHub gist {}/{} is a duplicate, skipping.", owner, name);
-        }
-    }
-    debug!("{} gist(s) found in total", result.len());
-    result.into_iter().collect()
+/// Iterate over GitHub gists belonging to given owner.
+#[inline]
+fn iter_gists(owner: &str) -> GistsIterator {
+    GistsIterator::new(owner)
 }
 
 /// Iterator over gists belonging to a particular owner.
@@ -369,6 +359,7 @@ impl<'o> GistsIterator<'o> {
                 .append_pair("per_page", &RESPONSE_PAGE_SIZE.to_string());
             url.into_string()
         };
+
         debug!("Iterating over GitHub gists for user {}", owner);
         GistsIterator{
             owner: owner,
@@ -451,23 +442,23 @@ impl<'o> GistsIterator<'o> {
             }
         }
 
-        trace!("Got to the end of gists for GitHub user {}", self.owner);
+        debug!("Got to the end of gists for GitHub user {}", self.owner);
         self.gists_url = None;
     }
 
     /// Convert a JSON representation of the gist into a Gist object.
     fn gist_from_json(&self, gist: &Json) -> Option<Gist> {
         let id = gist["id"].as_string().unwrap();
-        let gist_name = match gist_name_from_info(&gist) {
+        let name = match gist_name_from_info(&gist) {
             Some(name) => name,
             None => {
                 warn!("GitHub gist #{} (owner={}) has no files", id, self.owner);
                 return None;
             },
         };
-        let gist_uri = gist::Uri::new(ID, self.owner, gist_name).unwrap();
-        trace!("GitHub gist found ({}) with id={}", gist_uri, id);
-        Some(Gist::new(gist_uri, id))
+        let uri = gist::Uri::new(ID, self.owner, name).unwrap();
+        trace!("GitHub gist found ({}) with id={}", uri, id);
+        Some(Gist::new(uri, id))
     }
 }
 
