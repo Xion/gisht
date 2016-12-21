@@ -1,7 +1,5 @@
 //! Gist info module.
 
-#![allow(dead_code)]
-
 use std::borrow::{Borrow, Cow};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -17,7 +15,11 @@ custom_derive! {
         /// Name of the gist's owner.
         Owner,
         /// URL to the HTML page of the gist.
-        Url,
+        BrowserUrl,
+        /// URL to the "raw" version of the gist.
+        /// The meaning of this URL is host-specific, but it's typically
+        /// either a text/plain gist code, or a repository URL.
+        RawUrl,
         /// Description of the gist, typically provided by the owner upon creation.
         Description,
         /// Date/time the gist was created.
@@ -33,7 +35,7 @@ impl Datum {
             Datum::Owner |
             Datum::CreatedAt |
             Datum::UpdatedAt => "(unknown)",
-            Datum::Url => "N/A",
+            Datum::BrowserUrl | Datum::RawUrl => "N/A",
             Datum::Description => "",
         }
     }
@@ -43,7 +45,8 @@ impl fmt::Display for Datum {
         let msg = match *self {
             Datum::Id => "ID",
             Datum::Owner => "Owner",
-            Datum::Url => "URL",
+            Datum::BrowserUrl => "URL",
+            Datum::RawUrl => "URL (raw)",
             Datum::Description => "Description",
             Datum::CreatedAt => "Created at",
             Datum::UpdatedAt => "Last update",
@@ -57,7 +60,7 @@ pub type Value = String;
 
 
 /// Information about a particular gist.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Info {
     data: BTreeMap<Datum, Value>,
 }
@@ -94,6 +97,7 @@ pub struct InfoBuilder {
     data: BTreeMap<Datum, Value>,
 }
 
+#[allow(dead_code)]
 impl InfoBuilder {
     #[inline]
     pub fn new() -> Self {
@@ -108,6 +112,16 @@ impl InfoBuilder {
     }
 
     #[inline]
+    pub fn with_opt<V: ?Sized>(self, datum: Datum, opt_value: Option<&V>) -> Self
+        where Value: Borrow<V>, V: ToOwned<Owned=Value>
+    {
+        match opt_value {
+            Some(value) => self.with(datum, value),
+            None => self,
+        }
+    }
+
+    #[inline]
     pub fn without(mut self, datum: Datum) -> Self {
         self.unset(datum); self
     }
@@ -118,6 +132,16 @@ impl InfoBuilder {
     {
         self.data.insert(datum, value.to_owned());
         self
+    }
+
+    #[inline]
+    pub fn set_opt<V: ?Sized>(&mut self, datum: Datum, opt_value: Option<&V>) -> &mut Self
+        where Value: Borrow<V>, V: ToOwned<Owned=Value>
+    {
+        match opt_value {
+            Some(value) => self.set(datum, value),
+            None => self,
+        }
     }
 
     #[inline]

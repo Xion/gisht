@@ -15,23 +15,28 @@ pub use self::uri::{Uri, UriError};
 
 
 /// Structure representing a single gist.
-#[derive(Debug, Clone, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct Gist {
     /// URI to the gist.
     pub uri: Uri,
     /// Alternative, host-specific ID of the gist.
     pub id: Option<String>,
+    /// Optional gist info, which may be available.
+    ///
+    /// Note that this can be None or partial.
+    /// No piece of gist info is guaranteed to be available.
+    pub info: Option<Info>,
 }
 
 impl Gist {
     #[inline]
     pub fn new<I: ToString>(uri: Uri, id: I) -> Gist {
-        Gist{uri: uri, id: Some(id.to_string())}
+        Gist{uri: uri, id: Some(id.to_string()), info: None}
     }
 
     #[inline]
     pub fn from_uri(uri: Uri) -> Self {
-        Gist{uri: uri, id: None}
+        Gist{uri: uri, id: None, info: None}
     }
 
     /// Create the copy of Gist that has given ID attached.
@@ -39,13 +44,20 @@ impl Gist {
     pub fn with_id<S: ToString>(self, id: S) -> Self {
         Gist{id: Some(id.to_string()), ..self}
     }
+
+    /// Create a copy of Gist with given gist Info attached.
+    /// Note that two Gists are considered identical if they only differ by Info.
+    #[inline]
+    pub fn with_info(self, info: Info) -> Self {
+        Gist{info: Some(info), ..self}
+    }
 }
 
 impl Gist {
     /// Returns the path to this gist in the local gists directory
     /// (regardless whether it was downloaded or not).
     pub fn path(&self) -> PathBuf {
-        // If the gist is idenfied by a host-specific ID, it should be a part of the path
+        // If the gist is identified by a host-specific ID, it should be a part of the path
         // (because uri.name is most likely not unique in that case).
         // Otherwise, the gist's URI will form its path.
         let path_fragment = match self.id {
@@ -69,6 +81,14 @@ impl Gist {
         // Path::exists() will traverse symlinks, so this also ensures
         // that the target "binary" file of the gist exists.
         self.binary_path().exists()
+    }
+
+    /// Retrieve a specific piece of gist Info, if available.
+    #[inline]
+    pub fn info(&self, datum: Datum) -> Option<info::Value> {
+        self.info.as_ref().and_then(|info| {
+            if info.has(datum) { Some(info.get(datum).into_owned()) } else { None }
+        })
     }
 }
 

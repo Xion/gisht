@@ -96,7 +96,8 @@ impl Host for GitHub {
         const INFO_FIELDS: &'static [(Datum, &'static str)] = &[
             (Datum::Id, "id"),
             (Datum::Description, "description"),
-            (Datum::Url, "html_url"),
+            (Datum::BrowserUrl, "html_url"),
+            (Datum::RawUrl, "git_pull_url"),
             (Datum::CreatedAt, "created_at"),
             (Datum::UpdatedAt, "updated_at"),
         ];
@@ -300,20 +301,23 @@ fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
     assert!(gist.id.is_some(), "Gist {} has unknown GitHub ID!", gist.uri);
     assert!(!gist.path().exists(), "Directory for gist {} already exists!", gist.uri);
 
-    // Talk to GitHub to obtain the URL that we can clone the gist from
+    // Check if the Gist has a clone URL already in its metadata.
+    // Otherwise, talk to GitHub to obtain the URL that we can clone the gist from
     // as a Git repository.
-    let clone_url = {
-        // TODO: when iterating over GitHub gist, we'll actually get the clone URL
-        // in the /gists rsponse JSON, but drop it; add a metadata to Gist where
-        // it could be saved & reused here, w/o requesting gist info again
-        let info = try!(get_gist_info(&gist.id.as_ref().unwrap()));
-        let clone_url = info["git_pull_url"].as_string().unwrap().to_owned();
-        trace!("GitHub gist #{} has a git_pull_url=\"{}\"",
-            info["id"].as_string().unwrap(), clone_url);
-        clone_url
+    let clone_url = match gist.info(Datum::RawUrl).clone() {
+        Some(url) => url,
+        None => {
+            trace!("Need to get clone URL from GitHub for gist {}", gist.uri);
+            let info = try!(get_gist_info(&gist.id.as_ref().unwrap()));
+            let url = info["git_pull_url"].as_string().unwrap().to_owned();
+            trace!("GitHub gist #{} has a git_pull_url=\"{}\"",
+                info["id"].as_string().unwrap(), url);
+            url
+        }
     };
 
     // Create the gist's directory and clone it as a Git repo there.
+    debug!("Cloning GitHub gist from {}", clone_url);
     let path = gist.path();
     try!(fs::create_dir_all(&path));
     try!(Repository::clone(&clone_url, &path)
@@ -322,12 +326,14 @@ fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
     // Make sure the gist's executable is, in fact, executable.
     let executable = gist.path().join(&gist.uri.name);
     try!(mark_executable(&executable));
+    trace!("Marked file as gist executable: {}", executable.display());
 
     // Symlink the main/binary file to the binary directory.
     let binary = gist.binary_path();
     if !binary.exists() {
         try!(fs::create_dir_all(binary.parent().unwrap()));
         try!(symlink_file(&executable, &binary));
+        trace!("Created symlink to gist executable: {}", binary.display());
     }
 
     Ok(())
@@ -458,7 +464,14 @@ impl<'o> GistsIterator<'o> {
         };
         let uri = gist::Uri::new(ID, self.owner, name).unwrap();
         trace!("GitHub gist found ({}) with id={}", uri, id);
-        Some(Gist::new(uri, id))
+
+        // TODO: include the complete gist Info here by reusing the code from GitHub::gist_info;
+        // right now we only need clone URL so putting only it
+        let info = gist::InfoBuilder::new()
+            .with_opt(Datum::RawUrl, gist.find("git_pull_url").and_then(|url| url.as_string()))
+            .build();
+        let gist = Gist::new(uri, id).with_info(info);
+        Some(gist)
     }
 }
 
