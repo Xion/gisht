@@ -63,6 +63,9 @@ lazy_static! {
 
     /// Application version, as filled out by Cargo.
     static ref VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
+
+    /// Application revision, such as Git SHA.
+    static ref REVISION: Option<&'static str> = option_env!("X_CARGO_REVISION");
 }
 
 lazy_static! {
@@ -100,8 +103,9 @@ fn main() {
     });
 
     logging::init(opts.verbosity).unwrap();
-    trace!("gisht {}", VERSION.map(|v| format!("v{}", v))  // TODO: include git SHA
-        .unwrap_or_else(|| "(UNKNOWN VERSION)".to_owned()));
+    trace!("{} {}{}", *NAME,
+        VERSION.map(|v| format!("v{}", v)).unwrap_or_else(|| "<UNKNOWN VERSION>".into()),
+        REVISION.map(|r| format!(" ({})", r)).unwrap_or_else(|| "".into()));
 
     ensure_app_dir(&opts);
 

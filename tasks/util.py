@@ -60,9 +60,22 @@ def cargo(ctx, cmd, *args, **kwargs):
     cargo_args = [cmd]
     cargo_args.extend(args)
 
+    # Obtain Git SHA to pass it as environment variable to Cargo,
+    # so that it can be read in the binary code via env!() macro.
+    env = {}
+    git_sha = ctx.run('git rev-parse HEAD', warn=True, hide=True)
+    if git_sha.ok:
+        env['X_CARGO_REVISION'] = git_sha.stdout.strip()
+    else:
+        logging.warning(
+            "Cannot obtain Git SHA to save as revision being built: %s",
+            git_sha.stderr or git_sha.stdout)
+
     wait = kwargs.pop('wait', True)
     if wait:
+        kwargs.setdefault('env', {}).update(env)
         return ctx.run('cargo ' + ' '.join(map(quote, cargo_args)), **kwargs)
     else:
-        argv = ['cargo'] + cargo_args  # execvp() needs explicit argv[0]
-        os.execvp('cargo', argv)
+        argv = ['cargo'] + cargo_args  # execvpe() needs explicit argv[0]
+        env.update(os.environ)
+        os.execvpe(argv[0], argv, env)
