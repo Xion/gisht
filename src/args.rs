@@ -12,7 +12,7 @@ use conv::TryFrom;
 use conv::errors::Unrepresentable;
 use url;
 
-use super::gist;
+use super::{gist, NAME, VERSION};
 
 
 /// Parse command line arguments and return matches' object.
@@ -90,7 +90,7 @@ fn get_matches_with_completion<'a, 'p, I, T>(parser: Parser<'p>, argv: I) -> Res
     if let Some(shell) = matches.value_of(OPT_COMPLETION) {
         let shell = shell.parse::<Shell>().unwrap();
         debug!("Printing autocompletion script for {}...", shell);
-        create_full_parser().gen_completions_to(APP_NAME, shell, &mut io::stdout());
+        create_full_parser().gen_completions_to(*NAME, shell, &mut io::stdout());
         exit(0);
     }
 
@@ -313,8 +313,9 @@ impl FromStr for Command {
 type Parser<'p> = clap::App<'p, 'p>;
 
 
-const APP_NAME: &'static str = "gisht";
-const APP_DESC: &'static str = "Gists in the shell";
+lazy_static! {
+    static ref ABOUT: &'static str = option_env!("CARGO_PKG_DESCRIPTION").unwrap_or("");
+}
 
 const ARG_GIST: &'static str = "gist";
 const ARG_GIST_ARGV: &'static str = "argv";
@@ -360,12 +361,12 @@ fn create_full_parser<'p>() -> Parser<'p> {
 /// This base contains all the shared configuration (like the application name)
 /// and the flags shared by all gist subcommands.
 fn create_parser_base<'p>() -> Parser<'p> {
-    let mut parser = Parser::new(APP_NAME);
-    if let Some(version) = option_env!("CARGO_PKG_VERSION") {
+    let mut parser = Parser::new(*NAME);
+    if let Some(version) = *VERSION {
         parser = parser.version(version);
     }
     parser
-        .about(APP_DESC)
+        .about(*ABOUT)
 
         .setting(AppSettings::ArgRequiredElseHelp)
         .setting(AppSettings::UnifiedHelpMessage)

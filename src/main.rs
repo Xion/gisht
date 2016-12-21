@@ -58,12 +58,17 @@ use util::exitcode;
 
 
 lazy_static! {
+    /// Application / package name, as filled out by Cargo.
+    static ref NAME: &'static str = option_env!("CARGO_PKG_NAME").unwrap_or("gisht");
+
     /// Application version, as filled out by Cargo.
     static ref VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
+}
 
+lazy_static! {
     /// User-Agent header that the program uses for all outgoing HTTP requests.
     static ref USER_AGENT: String = match *VERSION {
-        Some(version) => format!("gisht/{}", version),
+        Some(version) => format!("{}/{}", *NAME, version),
         None => "gisht".to_owned(),
     };
 }
