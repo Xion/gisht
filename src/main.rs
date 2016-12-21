@@ -95,7 +95,7 @@ fn main() {
     });
 
     logging::init(opts.verbosity).unwrap();
-    trace!("gisht {}", VERSION.map(|v| format!("v{}", v))
+    trace!("gisht {}", VERSION.map(|v| format!("v{}", v))  // TODO: include git SHA
         .unwrap_or_else(|| "(UNKNOWN VERSION)".to_owned()));
 
     ensure_app_dir(&opts);

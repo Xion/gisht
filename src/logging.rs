@@ -108,8 +108,15 @@ impl slog_stream::Format for LogFormat {
                 let first_char = record.level().as_str().chars().next().unwrap();
                 first_char.to_uppercase().collect()
             };
+            let module = {
+                let module = record.module();
+                match module.find("::") {
+                    Some(idx) => Cow::Borrowed(&module[idx + 2..]),
+                    None => "main".into(),
+                }
+            };
             format!("{}{} {}#{}] {}\n",
-                level, logtime, record.module(), record.line(), record.msg())
+                level, logtime, module, record.line(), record.msg())
         } else {
             // Colorize the level label if we're outputting to a Unix terminal.
             let istty = cfg!(unix) && isatty::stderr_isatty();
