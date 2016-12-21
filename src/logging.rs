@@ -100,6 +100,8 @@ impl slog_stream::Format for LogFormat {
     fn format(&self, _: &mut io::Write,
               record: &slog::Record,
               _logger_kvp: &slog::OwnedKeyValueList) -> io::Result<()> {
+        let istty = cfg!(unix) && isatty::stderr_isatty();
+
         // Format the higher level (more fine-grained) messages with greater detail,
         // as they are only visible when user explicitly enables verbose logging.
         let msg = if record.level() > DEFAULT_LEVEL {
@@ -115,11 +117,13 @@ impl slog_stream::Format for LogFormat {
                     None => "main".into(),
                 }
             };
-            format!("{}{} {}#{}] {}\n",
-                level, logtime, module, record.line(), record.msg())
+            // Dim the prefix (everything that's not a message)
+            // if we're outputting to a Unix terminal.
+            let prefix_style = if istty { *TTY_FINE_PREFIX_STYLE } else { Style::default() };
+            let prefix = format!("{}{} {}#{}]", level, logtime, module, record.line());
+            format!("{} {}\n", prefix_style.paint(prefix), record.msg())
         } else {
             // Colorize the level label if we're outputting to a Unix terminal.
-            let istty = cfg!(unix) && isatty::stderr_isatty();
             let level: Cow<str> = if istty {
                 let style = TTY_LEVEL_STYLES.get(&record.level().as_usize())
                     .cloned()
@@ -158,6 +162,9 @@ lazy_static! {
         Level::Error.as_usize() => Colour::Red.normal(),
         Level::Critical.as_usize() => Colour::Purple.normal(),
     };
+
+    /// ANSI terminal style for the prefix (timestamp etc.) of a fine log message.
+    static ref TTY_FINE_PREFIX_STYLE: Style = Style::new().dimmed();
 }
 
 
