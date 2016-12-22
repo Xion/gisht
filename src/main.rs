@@ -188,25 +188,37 @@ fn decode_gist(opts: &Options) -> Gist {
         },
     };
 
-    if gist.is_local() {
+    let is_local = gist.is_local();
+    if is_local {
         trace!("Gist {} found among already downloaded gists", gist.uri);
-        if opts.locality == Some(Locality::Remote) {
+    } else {
+        trace!("Gist {} hasn't been download yet", gist.uri);
+    }
+
+    // Depending on the locality options, fetch a new or updated version of the gist,
+    // or perhaps even error out if it doesn't exist.
+    match opts.locality {
+        None => {
+            debug!("Possibly fetching or updating gist {}...", gist.uri);
+            let fetch_mode = if is_local { FetchMode::Auto } else { FetchMode::New };
+            if let Err(err) = gist.uri.host().fetch_gist(&gist, fetch_mode) {
+                error!("Failed to download/update gist {}: {}", gist.uri, err);
+                exit(exitcode::EX_IOERR);
+            }
+        },
+        Some(Locality::Local) => {
+            if !is_local {
+                error!("Gist {} is not available locally -- exiting.", gist.uri);
+                exit(exitcode::EX_NOINPUT);
+            }
+        },
+        Some(Locality::Remote) => {
             debug!("Forcing update of gist {}...", gist.uri);
             if let Err(err) = gist.uri.host().fetch_gist(&gist, FetchMode::Always) {
                 error!("Failed to update gist {}: {}", gist.uri, err);
                 exit(exitcode::EX_IOERR);
             }
-        }
-    } else {
-        if opts.locality == Some(Locality::Local) {
-            error!("Gist {} is not available locally -- exiting.", gist.uri);
-            exit(exitcode::EX_NOINPUT);
-        }
-        debug!("Fetching non-local gist {}...", gist.uri);
-        if let Err(err) = gist.uri.host().fetch_gist(&gist, FetchMode::New) {
-            error!("Failed to download gist {}: {}", gist.uri, err);
-            exit(exitcode::EX_IOERR);
-        }
+        },
     }
 
     gist

@@ -20,10 +20,13 @@ pub trait Host : Send + Sync {
     // Returns a user-visible name of the gists' host.
     fn name(&self) -> &str;
 
-    /// Fetch a current version of the gist.
+    /// Fetch a current version of the gist if necessary.
+    ///
+    /// The `mode` parameter specifies in what circumstances the gist will be fetched
+    /// from the remote host: always, only if new, or when needed.
     ///
     /// If the gist has been downloaded previously,
-    /// it may be updated instead (e.g. via pull rather than clone
+    /// it can also be updated instead (e.g. via pull rather than clone
     /// if its a Git repo).
     fn fetch_gist(&self, gist: &Gist, mode: FetchMode) -> io::Result<()>;
 

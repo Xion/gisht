@@ -46,7 +46,7 @@ impl Host for GitHub {
     /// Fetch the gist's repo from GitHub & create the appropriate binary symlink.
     ///
     /// If the gist hasn't been downloaded already, a clone of the gist's Git repo is performed.
-    /// Otherwise, it's just a simple Git pull.
+    /// Otherwise, updating the gist (if needed) is just a simple Git pull.
     fn fetch_gist(&self, gist: &Gist, mode: FetchMode) -> io::Result<()> {
         try!(ensure_github_gist(gist));
         let gist = try!(resolve_gist(gist));
@@ -241,6 +241,8 @@ fn id_from_binary_path<P: AsRef<Path>>(path: P) -> io::Result<String> {
 /// the function will assume the update is necessary.
 fn needs_update<G: AsRef<Gist>>(gist: G) -> bool {
     let gist = gist.as_ref();
+    trace!("Checking if GitHub gist {} requires an update...", gist.uri);
+
     let last = match last_update_time(&gist) {
         Ok(time) => time,
         Err(err) => {
@@ -275,6 +277,7 @@ fn update_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
     assert!(gist.id.is_some(), "Gist {} has unknown GitHub ID!", gist.uri);
     assert!(gist.path().exists(), "Directory for gist {} doesn't exist!", gist.uri);
 
+    debug!("Updating GitHub gist {}...", gist.uri);
     try!(git_pull(gist.path(), "origin", /* reflog_msg */ Some("gisht-update"))
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
     // TODO: conficts?
@@ -286,6 +289,9 @@ fn update_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
 fn git_pull<P: AsRef<Path>>(repo_path: P,
                             remote: &str,
                             reflog_msg: Option<&str>) -> Result<(), git2::Error> {
+    let repo_path = repo_path.as_ref();
+    trace!("Doing `git pull` from remote `{}` inside {}", remote, repo_path.display());
+
     // Since libgit2 is low-level, we have to perform the requisite steps manually,
     // which means:
     // * doing the fetch from origin remote
@@ -303,6 +309,7 @@ fn git_pull<P: AsRef<Path>>(repo_path: P,
 /// Given Gist object must have the GitHub ID associated with it.
 fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
     let gist = gist.as_ref();
+    assert!(gist.uri.host_id != ID, "Gist {} is not a GitHub gist!", gist.uri);
     assert!(gist.id.is_some(), "Gist {} has unknown GitHub ID!", gist.uri);
     assert!(!gist.path().exists(), "Directory for gist {} already exists!", gist.uri);
 
