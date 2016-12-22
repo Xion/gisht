@@ -15,7 +15,7 @@ Magic!
 ## Usage
 
     gisht [OPTIONS] [SUBCOMMAND]
-
+    
     OPTIONS:
         -c, --cached     Operate only on gists available locally
         -f, --fetch      Always fetch the gist from a remote host
@@ -23,7 +23,7 @@ Magic!
         -q, --quiet      Decrease logging verbosity
         -H, --help       Prints help information
         -V, --version    Prints version information
-
+    
     SUBCOMMANDS:
         run      Run the specified gist
         which    Output the path to gist's binary
@@ -31,10 +31,10 @@ Magic!
         open     Open the gist's webpage
         info     Display summary information about the gist
         help     Prints this message or the help of the given subcommand(s)
-
+    
     Hint: `gisht run GIST` can be shortened to just `gisht GIST`.
     If you want to pass arguments, put them after `--` (two dashes), like this:
-
+    
     	gisht Octocat/greet -- "Hello world" --cheerful
 
 ## Development

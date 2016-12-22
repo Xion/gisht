@@ -22,7 +22,7 @@ use super::super::USER_AGENT;
 use ext::hyper::header::Link;
 use gist::{self, Datum, Gist};
 use util::{mark_executable, symlink_file};
-use super::Host;
+use super::{FetchMode, Host};
 
 
 /// GitHub host ID.
@@ -47,15 +47,17 @@ impl Host for GitHub {
     ///
     /// If the gist hasn't been downloaded already, a clone of the gist's Git repo is performed.
     /// Otherwise, it's just a simple Git pull.
-    fn fetch_gist(&self, gist: &Gist) -> io::Result<()> {
+    fn fetch_gist(&self, gist: &Gist, mode: FetchMode) -> io::Result<()> {
         try!(ensure_github_gist(gist));
         let gist = try!(resolve_gist(gist));
 
         if gist.is_local() {
-            // XXX: needs_update() is actually screwing up with the --remote flag;
-            // we either need to remove it, or make sure a gist is non-local (basically delete its files)
-            // if --remote is passed, prior to invoking Host::fetch_gist
-            if needs_update(&gist) {
+            let update = match mode {
+                FetchMode::Auto => needs_update(&gist),
+                FetchMode::Always => true,
+                FetchMode::New => false,
+            };
+            if update {
                 try!(update_gist(gist));
             }
         } else {
@@ -68,6 +70,7 @@ impl Host for GitHub {
     /// Return the URL to gist's HTML website.
     fn gist_url(&self, gist: &Gist) -> io::Result<String> {
         debug!("Building URL for {:?}", gist);
+
         let gist = if gist.id.is_none() {
             trace!("Gist {} has no GitHub ID, attempting to resolve", gist.uri);
             try!(resolve_gist(gist))
@@ -76,10 +79,12 @@ impl Host for GitHub {
                 gist.uri, gist.id.as_ref().unwrap());
             Cow::Borrowed(gist)
         };
-        let mut url = Url::parse(HTML_URL).unwrap();
-        url.set_path(&format!("{}/{}", gist.uri.owner, gist.id.as_ref().unwrap()));
 
-        let url = url.into_string();
+        let url = {
+            let mut url = Url::parse(HTML_URL).unwrap();
+            url.set_path(&format!("{}/{}", gist.uri.owner, gist.id.as_ref().unwrap()));
+            url.into_string()
+        };
         trace!("Browser URL for {:?}: {}", gist, url);
         Ok(url)
     }

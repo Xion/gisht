@@ -54,6 +54,7 @@ use ansi_term::{Colour, Style};
 use args::{ArgsError, Command, GistArg, Locality, Options};
 use commands::{run_gist, print_binary_path, print_gist, open_gist, show_gist_info};
 use gist::Gist;
+use hosts::FetchMode;
 use util::exitcode;
 
 
@@ -191,7 +192,7 @@ fn decode_gist(opts: &Options) -> Gist {
         trace!("Gist {} found among already downloaded gists", gist.uri);
         if opts.locality == Some(Locality::Remote) {
             debug!("Forcing update of gist {}...", gist.uri);
-            if let Err(err) = gist.uri.host().fetch_gist(&gist) {
+            if let Err(err) = gist.uri.host().fetch_gist(&gist, FetchMode::Always) {
                 error!("Failed to update gist {}: {}", gist.uri, err);
                 exit(exitcode::EX_IOERR);
             }
@@ -202,7 +203,7 @@ fn decode_gist(opts: &Options) -> Gist {
             exit(exitcode::EX_NOINPUT);
         }
         debug!("Fetching non-local gist {}...", gist.uri);
-        if let Err(err) = gist.uri.host().fetch_gist(&gist) {
+        if let Err(err) = gist.uri.host().fetch_gist(&gist, FetchMode::New) {
             error!("Failed to download gist {}: {}", gist.uri, err);
             exit(exitcode::EX_IOERR);
         }

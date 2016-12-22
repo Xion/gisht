@@ -25,7 +25,7 @@ pub trait Host : Send + Sync {
     /// If the gist has been downloaded previously,
     /// it may be updated instead (e.g. via pull rather than clone
     /// if its a Git repo).
-    fn fetch_gist(&self, gist: &Gist) -> io::Result<()>;
+    fn fetch_gist(&self, gist: &Gist, mode: FetchMode) -> io::Result<()>;
 
     /// Return a URL to a HTML page that can display the gist.
     /// This may involve talking to the remote host.
@@ -52,6 +52,27 @@ pub trait Host : Send + Sync {
         // as pointing to any gist hosted by this host.
         None
     }
+}
+
+custom_derive! {
+    #[derive(Clone, Debug, PartialEq, Eq,
+             IterVariants(FetchModes))]
+    pub enum FetchMode {
+        /// Automatically decide how & whether to fetch the gist.
+        ///
+        /// This is host-specific, but should typically mean that the gist
+        /// is only updated periodically, or when it's necessary to do so.
+        Auto,
+        /// Always fetch the gist from the remote host.
+        Always,
+        /// Only fetch the gist if necessary
+        /// (i.e. when it hasn't been downloaded before).
+        New,
+    }
+}
+impl Default for FetchMode {
+    #[inline]
+    fn default() -> Self { FetchMode::Auto }
 }
 
 
