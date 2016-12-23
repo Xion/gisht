@@ -7,7 +7,7 @@ use std::fmt;
 
 custom_derive! {
     /// Enum listing all the recognized pieces of gist information.
-    #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd,
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd,
              IterVariants(Data))]
     pub enum Datum {
         /// Host-specific ID of the gist.

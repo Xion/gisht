@@ -4,6 +4,7 @@
 //! NOT the actual GitHub repository hosting.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read};
 use std::iter::Iterator;
@@ -80,11 +81,14 @@ impl Host for GitHub {
             Cow::Borrowed(gist)
         };
 
-        let url = {
+        // See if there is an existing URL included in the gist::Info.
+        // Otherwise, build it manually.
+        let url = gist.info(Datum::BrowserUrl).unwrap_or_else(|| {
+            trace!("URL not found in gist info, building it manually");
             let mut url = Url::parse(HTML_URL).unwrap();
             url.set_path(&format!("{}/{}", gist.uri.owner, gist.id.as_ref().unwrap()));
             url.into_string()
-        };
+        });
         trace!("Browser URL for {:?}: {}", gist, url);
         Ok(url)
     }
@@ -97,24 +101,8 @@ impl Host for GitHub {
         let id = gist.id.as_ref().unwrap();
         let info = try!(get_gist_info(id));
 
-        // Build the gist::Info structure from known keys in the gist info JSON.
-        const INFO_FIELDS: &'static [(Datum, &'static str)] = &[
-            (Datum::Id, "id"),
-            (Datum::Description, "description"),
-            (Datum::BrowserUrl, "html_url"),
-            (Datum::RawUrl, "git_pull_url"),
-            (Datum::CreatedAt, "created_at"),
-            (Datum::UpdatedAt, "updated_at"),
-        ];
-        let mut result = gist::InfoBuilder::new();
-        for &(datum, field) in INFO_FIELDS {
-            match info.find(field).and_then(|f| f.as_string()) {
-                Some(value) => { result.set(datum, value); },
-                None => { warn!("Missing info key '{}' for gist ID={}", field, id); },
-            }
-        }
-        result.set(Datum::Owner, gist_owner_from_info(&info));
-        Ok(Some(result.build()))
+        let result = build_gist_info(&info, &[]);
+        Ok(Some(result))
     }
 
     /// Return a Gist based on URL to its URL page.
@@ -202,6 +190,8 @@ fn resolve_gist(gist: &Gist) -> io::Result<Cow<Gist>> {
     if gist.id.is_some() {
         return Ok(gist);
     }
+
+    // TODO: copy over gist.info if it's there
 
     // If the gist doesn't have the ID associated with it,
     // resolve the owner/name by either checking the already existing,
@@ -477,16 +467,16 @@ impl<'o> GistsIterator<'o> {
         let uri = gist::Uri::new(ID, self.owner, name).unwrap();
         trace!("GitHub gist found ({}) with id={}", uri, id);
 
-        // TODO: include the complete gist Info here by reusing the code from GitHub::gist_info;
-        // right now we only need clone URL so putting only it
-        let info = gist::InfoBuilder::new()
-            .with_opt(Datum::RawUrl, gist.find("git_pull_url").and_then(|url| url.as_string()))
-            .build();
-        let gist = Gist::new(uri, id).with_info(info);
-        Some(gist)
+        // Include the gist Info with fields that are commonly used by gist commands.
+        // TODO: determine the complete set of fields that can be fetched here
+        let info = build_gist_info(&gist, &[Datum::RawUrl, Datum::BrowserUrl]);
+        let result = Gist::new(uri, id).with_info(info);
+        Some(result)
     }
 }
 
+
+// Handling gist info JSON
 
 /// Retrieve information/metadata about a gist.
 /// Returns a Json object with the parsed GitHub response.
@@ -505,6 +495,43 @@ fn get_gist_info(gist_id: &str) -> io::Result<Json> {
         .send()
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
     Ok(read_json(&mut resp))
+}
+
+/// Build the complete gist Info from its GitHub JSON representation.
+/// If fields are non-empty, only selected fields are included in the info.
+fn build_gist_info(info: &Json, data: &[Datum]) -> gist::Info {
+    let mut data: Vec<_> = data.to_vec();
+    if data.is_empty() {
+        data = Datum::iter_variants().collect();
+    }
+
+    lazy_static! {
+        // Mapping of gist::Info items to keys in the JSON.
+        static ref INFO_FIELDS: HashMap<Datum, &'static str> = hashmap!{
+            Datum::Id => "id",
+            Datum::Description => "description",
+            Datum::BrowserUrl => "html_url",
+            Datum::RawUrl => "git_pull_url",
+            Datum::CreatedAt => "created_at",
+            Datum::UpdatedAt => "updated_at",
+        };
+    }
+    let mut result = gist::InfoBuilder::new();
+    for datum in data {
+        if let Some(field) = INFO_FIELDS.get(&datum) {
+            match info.find(field).and_then(|f| f.as_string()) {
+                Some(value) => { result.set(datum, value); },
+                None => { warn!("Missing info key '{}' in gist JSON", field); },
+            }
+        } else {
+            // Special-cased data that are more complicated to get.
+            match datum {
+                Datum::Owner => { result.set(datum, gist_owner_from_info(&info)); },
+                _ => { panic!("Unexpected gist info data piece: {:?}", datum); },
+            }
+        }
+    }
+    result.build()
 }
 
 /// Retrieve gist name from the parsed JSON of gist info.
