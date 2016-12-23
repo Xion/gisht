@@ -5,6 +5,7 @@
 //! "pastebins", including the pastebin.com namesake.
 
 mod github;
+mod pastebin;
 
 
 use std::collections::HashMap;
@@ -83,6 +84,7 @@ lazy_static! {
     /// Mapping of gist host identifiers (like "gh") to Host structs.
     pub static ref HOSTS: HashMap<&'static str, Arc<Host>> = hashmap!{
         github::ID => Arc::new(github::GitHub::new()) as Arc<Host>,
+        pastebin::ID => Arc::new(pastebin::Pastebin::new()) as Arc<Host>,
     };
 }
 

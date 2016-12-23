@@ -192,7 +192,7 @@ fn decode_gist(opts: &Options) -> Gist {
     if is_local {
         trace!("Gist {} found among already downloaded gists", gist.uri);
     } else {
-        trace!("Gist {} hasn't been download yet", gist.uri);
+        trace!("Gist {} hasn't been downloaded yet", gist.uri);
     }
 
     // Depending on the locality options, fetch a new or updated version of the gist,

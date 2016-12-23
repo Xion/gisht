@@ -328,7 +328,7 @@ fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
     // Make sure the gist's executable is, in fact, executable.
     let executable = gist.path().join(&gist.uri.name);
     try!(mark_executable(&executable));
-    trace!("Marked file as gist executable: {}", executable.display());
+    trace!("Marked gist file as executable: {}", executable.display());
 
     // Symlink the main/binary file to the binary directory.
     let binary = gist.binary_path();
