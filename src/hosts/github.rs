@@ -309,7 +309,7 @@ fn git_pull<P: AsRef<Path>>(repo_path: P,
 /// Given Gist object must have the GitHub ID associated with it.
 fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
     let gist = gist.as_ref();
-    assert!(gist.uri.host_id != ID, "Gist {} is not a GitHub gist!", gist.uri);
+    assert!(gist.uri.host_id == ID, "Gist {} is not a GitHub gist!", gist.uri);
     assert!(gist.id.is_some(), "Gist {} has unknown GitHub ID!", gist.uri);
     assert!(!gist.path().exists(), "Directory for gist {} already exists!", gist.uri);
 
