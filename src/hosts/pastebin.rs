@@ -63,7 +63,8 @@ impl Host for Pastebin {
 
     /// Return the URL to paste's HTML website.
     fn gist_url(&self, gist: &Gist) -> io::Result<String> {
-        assert!(gist.id.is_some(), "Pastebin.com paste has no ID!");
+        try!(ensure_pastebin_paste(gist));
+        let gist = resolve_gist(gist);
 
         debug!("Building URL for {:?}", gist);
         let url ={

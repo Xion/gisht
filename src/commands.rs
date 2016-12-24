@@ -170,7 +170,10 @@ pub fn show_gist_info(gist: &Gist) -> ! {
     });
     match maybe_info {
         Some(info) => { print!("{}", info); exit(exitcode::EX_OK) },
-        None => exit(exitcode::EX_UNAVAILABLE),
+        None => {
+            warn!("No information available about gist {}", gist.uri);
+            exit(exitcode::EX_UNAVAILABLE);
+        },
     };
 }
 
