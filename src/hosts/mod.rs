@@ -6,6 +6,7 @@
 
 mod github;
 mod pastebin;
+mod simple;
 
 
 use std::collections::HashMap;
