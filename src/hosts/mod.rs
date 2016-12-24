@@ -92,6 +92,10 @@ lazy_static! {
                                      "http://pastebin.com/raw/${id}",
                                      "http://pastebin.com/${id}",
                                      Regex::new("[0-9a-zA-Z]+").unwrap())) as Arc<Host>,
+        "lp" => Arc::new(Simple::new("lp", "lpaste.net",
+                                     "http://lpaste.net/raw/${id}",
+                                     "http://lpaste.net/${id}",
+                                     Regex::new("[0-9]+").unwrap())) as Arc<Host>,
     };
 }
 
