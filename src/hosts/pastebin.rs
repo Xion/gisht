@@ -6,17 +6,17 @@
 
 use std::borrow::Cow;
 use std::fs;
-use std::io::{self, Read, Write};
+use std::io::{self, BufRead, BufReader, Write};
 use std::marker::PhantomData;
 use std::path::Path;
 
 use hyper::client::{Client, Response};
-use hyper::header::{ContentLength, UserAgent};
+use hyper::header::UserAgent;
 use url::Url;
 
 use super::super::USER_AGENT;
 use gist::{self, Gist};
-use util::{mark_executable, symlink_file};
+use util::{LINESEP, mark_executable, symlink_file};
 use super::{FetchMode, Host};
 
 
@@ -162,28 +162,16 @@ fn write_http_response_file<P: AsRef<Path>>(response: &mut Response, path: P) ->
         .create(true).write(true).truncate(true)
         .open(path));
 
-    // Prepare a buffer for reading of the response.
-    const DEFAULT_BUF_SIZE: usize = 8192;
-    const MAX_BUF_SIZE: usize = 16777216;  // 16 MB
-    let buf_size = match response.headers.get::<ContentLength>() {
-        Some(&ContentLength(l)) => if l as usize > MAX_BUF_SIZE {
-            trace!("Large HTTP response ({} bytes); using max buffer size ({} bytes)",
-                l, MAX_BUF_SIZE);
-            MAX_BUF_SIZE
-        } else { l as usize },
-        None => DEFAULT_BUF_SIZE,
-    };
-    let mut buffer = vec![0; buf_size];
-
-    // Read it & write to the file.
-    loop {
-        let c = try!(response.read(&mut buffer));
-        if c > 0 {
-            trace!("Writing {} bytes to {}", c, path.display());
-            try!(file.write_all(&buffer[0..c]));
-        }
-        if c < buf_size { break }
+    // Read the response line-by-line and write it to the file
+    // with an OS-specific line separator.
+    let reader = BufReader::new(response);
+    let mut line_count = 0;
+    for line in reader.lines() {
+        let line = try!(line);
+        try!(file.write_fmt(format_args!("{}{}", line, LINESEP)));
+        line_count += 1;
     }
 
+    trace!("Wrote {} line(s) to {}", line_count, path.display());
     Ok(())
 }
