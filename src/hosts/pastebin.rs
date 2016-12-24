@@ -12,6 +12,7 @@ use std::path::Path;
 
 use hyper::client::{Client, Response};
 use hyper::header::UserAgent;
+use regex::{self, Regex};
 use url::Url;
 
 use super::super::USER_AGENT;
@@ -74,13 +75,53 @@ impl Host for Pastebin {
         Ok(url)
     }
 
-    fn resolve_url(&self, _: &str) -> Option<io::Result<Gist>> {
-        None // TODO: implement
+    /// Return a Gist based on URL to a paste's browser website.
+    fn resolve_url(&self, url: &str) -> Option<io::Result<Gist>> {
+        trace!("Checking if `{}` is a Pastebin.com paste URL", url);
+
+        // Clean up the URL a little, e.g. by converting HTTPS to HTTP
+        // since this is what Pastebin.com uses by default.
+        let orig_url = url.to_owned();
+        let url: Cow<str> = {
+            let url = url.trim().trim_right_matches("/");
+            if url.starts_with("https://") {
+                format!("http://{}", url.trim_left_matches("https://")).into()
+            } else {
+                url.into()
+            }
+        };
+
+        // Check if it matches the pattern of paste's page URLs.
+        let captures = match HTML_URL_RE.captures(&*url) {
+            Some(c) => c,
+            None => {
+                debug!("URL {} doesn't point to a Pastebin.com gist", orig_url);
+                return None;
+            },
+        };
+
+        let id = captures.name("id").unwrap();
+        debug!("URL {} points to a Pastebin.com gist: ID={}", orig_url, id);
+
+        // Return the resolved gist.
+        // In the gist URI, the ID is also used as name, since Pastebin.com gists
+        // do not have an independent, user-provided name.
+        let uri = gist::Uri::from_name(ID, id).unwrap();
+        let gist = Gist::from_uri(uri).with_id(id);
+        trace!("URL resolves to Pastebin.com gist {} (ID={})", gist.uri, gist.id.as_ref().unwrap());
+        Some(Ok(gist))
     }
 }
 
 /// Base URL to pastes' HTML pages.
 const HTML_URL: &'static str = "http://pastebin.com";
+
+lazy_static! {
+    /// Regular expression for parsing URLs to pastes HTML pages.
+    static ref HTML_URL_RE: Regex = Regex::new(
+        &format!("^{}/{}$", regex::quote(HTML_URL), r#"(?P<id>[0-9a-zA-Z]+)"#)
+    ).unwrap();
+}
 
 
 // Fetching pastes (gists)
@@ -122,9 +163,6 @@ fn download_paste(gist: &Gist) -> io::Result<&Gist> {
     debug!("Saving paste {} as {}", gist.uri, path.display());
     try!(fs::create_dir_all(path.parent().unwrap()));
     try!(write_http_response_file(&mut resp, &path));
-    // TODO: pastes created on non-Linux systems may have additional characters besides \n
-    // as line terminators, which screws with hashbang recognition;
-    // make sure the newlines are sanitized to be OS-specific when writing the paste
 
     // Make sure the gist's executable is, in fact, executable.
     let executable = path;
@@ -174,4 +212,41 @@ fn write_http_response_file<P: AsRef<Path>>(response: &mut Response, path: P) ->
 
     trace!("Wrote {} line(s) to {}", line_count, path.display());
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::{HTML_URL, HTML_URL_RE};
+
+    #[test]
+    fn html_url_regex() {
+        lazy_static! {
+            static ref VALID_HTML_URLS: Vec<(/* URL */ String,
+                                             /* ID */ &'static str)> = vec![
+                (HTML_URL.to_owned() + "/abc", "abc"),                // short
+                (HTML_URL.to_owned() + "/a1b2c3d4e5", "a1b2c3d4e5"),  // long
+                (HTML_URL.to_owned() + "/43ffg", "43ffg"),            // starts with digit
+                (HTML_URL.to_owned() + "/46417247", "46417247"),      // only digits
+                (HTML_URL.to_owned() + "/MfgT45f", "MfgT45f"),        // mixed case
+            ];
+            static ref INVALID_HTML_URLS: Vec<String> = vec![
+                HTML_URL.to_owned() + "/a/b/c",         // too many path segments
+                HTML_URL.to_owned() + "/a/",            // trailing slash
+                HTML_URL.to_owned() + "//",             // ID must not be empty
+                HTML_URL.to_owned() + "/",              // no ID at all
+                "http://example.com/fhdFG36ok".into(),  // wrong Pastebin.com domain
+                "foobar".into(),                        // not even an URL
+            ];
+        }
+        for &(ref valid_url, id) in &*VALID_HTML_URLS {
+            let captures = HTML_URL_RE.captures(valid_url)
+                .expect(&format!("Paste's HTML URL was incorrectly deemed invalid: {}", valid_url));
+            assert_eq!(id, captures.name("id").unwrap());
+        }
+        for invalid_url in &*INVALID_HTML_URLS {
+            assert!(!HTML_URL_RE.is_match(invalid_url),
+                "URL was incorrectly deemed a valid gist HTML URL: {}", invalid_url);
+        }
+    }
 }

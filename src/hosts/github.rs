@@ -105,7 +105,7 @@ impl Host for GitHub {
         Ok(Some(result))
     }
 
-    /// Return a Gist based on URL to its URL page.
+    /// Return a Gist based on URL to its browser HTML page.
     fn resolve_url(&self, url: &str) -> Option<io::Result<Gist>> {
         trace!("Checking if `{}` is a GitHub gist URL", url);
 
@@ -159,7 +159,7 @@ const HTML_URL: &'static str = "https://gist.github.com";
 lazy_static! {
     /// Regular expression for parsing URLs to gist HTML pages.
     static ref HTML_URL_RE: Regex = Regex::new(
-        &format!("^{}{}$", regex::quote(HTML_URL), r#"/((?P<owner>[^/]+)/)?(?P<id>[0-9a-fA-F]+)"#)
+        &format!("^{}/{}$", regex::quote(HTML_URL), r#"((?P<owner>[^/]+)/)?(?P<id>[0-9a-fA-F]+)"#)
     ).unwrap();
 }
 
