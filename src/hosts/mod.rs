@@ -13,7 +13,10 @@ use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
 
+use regex::Regex;
+
 use super::gist::{self, Gist};
+use self::simple::Simple;
 
 
 /// Represents a gists' host: a (web) service that hosts gists (code snippets).
@@ -85,7 +88,10 @@ lazy_static! {
     /// Mapping of gist host identifiers (like "gh") to Host structs.
     pub static ref HOSTS: HashMap<&'static str, Arc<Host>> = hashmap!{
         github::ID => Arc::new(github::GitHub::new()) as Arc<Host>,
-        pastebin::ID => Arc::new(pastebin::Pastebin::new()) as Arc<Host>,
+        "pb" => Arc::new(Simple::new("pb", "Pastebin.com",
+                                     "http://pastebin.com/raw/${id}",
+                                     "http://pastebin.com/${id}",
+                                     Regex::new("[0-9a-zA-Z]+").unwrap())) as Arc<Host>,
     };
 }
 

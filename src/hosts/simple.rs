@@ -48,6 +48,7 @@ pub struct Simple {
 
 // Creation functions.
 impl Simple {
+    // TODO: use the Builder pattern
     pub fn new(id: &'static str,
                name: &'static str,
                raw_url_pattern: &'static str,
