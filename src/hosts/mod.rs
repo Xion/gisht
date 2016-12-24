@@ -5,7 +5,6 @@
 //! "pastebins", including the pastebin.com namesake.
 
 mod github;
-mod pastebin;
 mod simple;
 
 
@@ -13,10 +12,8 @@ use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
 
-use regex::Regex;
-
 use super::gist::{self, Gist};
-use self::simple::Simple;
+use self::simple::*;
 
 
 /// Represents a gists' host: a (web) service that hosts gists (code snippets).
@@ -88,14 +85,8 @@ lazy_static! {
     /// Mapping of gist host identifiers (like "gh") to Host structs.
     pub static ref HOSTS: HashMap<&'static str, Arc<Host>> = hashmap!{
         github::ID => Arc::new(github::GitHub::new()) as Arc<Host>,
-        "pb" => Arc::new(Simple::new("pb", "Pastebin.com",
-                                     "http://pastebin.com/raw/${id}",
-                                     "http://pastebin.com/${id}",
-                                     Regex::new("[0-9a-zA-Z]+").unwrap())) as Arc<Host>,
-        "lp" => Arc::new(Simple::new("lp", "lpaste.net",
-                                     "http://lpaste.net/raw/${id}",
-                                     "http://lpaste.net/${id}",
-                                     Regex::new("[0-9]+").unwrap())) as Arc<Host>,
+        pastebin::ID => Arc::new(pastebin::create()) as Arc<Host>,
+        lpaste::ID => Arc::new(lpaste::create()) as Arc<Host>,
     };
 }
 

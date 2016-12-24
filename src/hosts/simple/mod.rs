@@ -1,5 +1,9 @@
 //! Module implementing a generic simple gist host.
 
+pub mod lpaste;
+pub mod pastebin;
+
+
 use std::borrow::Cow;
 use std::fs;
 use std::io::{self, BufRead, BufReader, Write};
@@ -79,6 +83,12 @@ impl Simple {
             "URL pattern `{}` does not contain the ID placeholder `{}`",
             pattern, ID_PLACEHOLDER)
     }
+}
+
+// Accessors / getters.
+// These are mostly used for testing of individual host setups.
+impl Simple {
+    pub fn html_url_regex(&self) -> &Regex { &self.html_url_re }
 }
 
 impl Host for Simple {
