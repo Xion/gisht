@@ -7,6 +7,7 @@
 mod common;
 
 mod github;
+mod bpaste;
 mod heypasteit;
 mod lpaste;
 mod pastebin;
@@ -85,12 +86,13 @@ impl Default for FetchMode {
 
 
 lazy_static! {
-    /// Mapping of gist host identifiers (like "gh") to Host structs.
+    /// Mapping of gist host identifiers to Host structs.
     pub static ref HOSTS: HashMap<&'static str, Arc<Host>> = hashmap!{
         github::ID => Arc::new(github::GitHub::new()) as Arc<Host>,
         pastebin::ID => Arc::new(pastebin::create()) as Arc<Host>,
         lpaste::ID => Arc::new(lpaste::create()) as Arc<Host>,
         heypasteit::ID => Arc::new(heypasteit::create()) as Arc<Host>,
+        bpaste::ID => Arc::new(bpaste::create()) as Arc<Host>,
     };
 }
 
