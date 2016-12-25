@@ -35,6 +35,7 @@ const HTTPS: &'static str = "https://";
 ///
 /// As it turns out, a surprising number of actual gist hosts fit this description,
 /// including the popular ones such pastebin.com.
+#[derive(Debug)]
 pub struct Simple {
     /// ID of the gist host.
     pub id: &'static str,
@@ -99,8 +100,8 @@ impl Simple {
     pub fn html_url_regex(&self) -> &Regex { &self.html_url_re }
 
     /// Returns the scheme + domain part of HTML URLs, like: http://example.com
-    pub fn html_url_prefix(&self) -> String {
-        Url::parse(self.html_url_pattern).unwrap().origin().ascii_serialization()
+    pub fn html_url_origin(&self) -> String {
+        Url::parse(self.html_url_pattern).unwrap().origin().unicode_serialization()
     }
 }
 
@@ -295,4 +296,41 @@ fn write_http_response_file<P: AsRef<Path>>(response: &mut Response, path: P) ->
 
     trace!("Wrote {} line(s) to {}", line_count, path.display());
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use regex::Regex;
+    use super::Simple;
+
+    const ID: &'static str = "foo";
+    const NAME: &'static str = "Foo";
+    lazy_static! {
+        static ref ID_RE: Regex = Regex::new(r"\w+").unwrap();
+    }
+
+    #[test]
+    fn invalid_raw_url() {
+        let error = Simple::new(
+            ID, NAME, "invalid", "http://example.com/${id}", ID_RE.clone()).unwrap_err();
+        assert!(format!("{}", error).contains("URL"));
+
+        let error = Simple::new(ID, NAME,
+                                "http://example.com/nolaceholder",
+                                "http://example.com/${id}", ID_RE.clone()).unwrap_err();
+        assert!(format!("{}", error).contains("placeholder"));
+    }
+
+    #[test]
+    fn invalid_html_url() {
+        let error = Simple::new(
+            ID, NAME, "http://example.com/${id}", "invalid", ID_RE.clone()).unwrap_err();
+        assert!(format!("{}", error).contains("URL"));
+
+        let error = Simple::new(ID, NAME,
+                                "http://example.com/${id}",
+                                "http://example.com/nolaceholder", ID_RE.clone()).unwrap_err();
+        assert!(format!("{}", error).contains("placeholder"));
+    }
 }

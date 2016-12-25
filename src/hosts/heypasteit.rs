@@ -25,7 +25,7 @@ mod tests {
     #[test]
     fn html_url_regex() {
         let host = create();
-        let html_url: String = host.html_url_prefix() + "/clip";
+        let html_url: String = host.html_url_origin() + "/clip";
 
         let valid_html_urls: Vec<(/* URL */ String,
                                   /* ID */ &'static str)> = vec![
