@@ -9,6 +9,7 @@ use std::path::Path;
 use hyper::client::{Client, Response};
 use hyper::header::UserAgent;
 use regex::{self, Regex};
+use url::Url;
 
 use ::USER_AGENT;
 use gist::{self, Gist};
@@ -74,6 +75,9 @@ impl Simple {
     }
 
     fn check_url_pattern(pattern: &'static str) -> Result<(), Box<Error>> {
+        try!(Url::parse(pattern)
+            .map_err(|e| format!("`{}` is not a valid URL: {}", pattern, e)));
+
         if ![HTTP, HTTPS].iter().any(|p| pattern.starts_with(p)) {
             return Err(format!(
                 "URL pattern `{}` doesn't start with a known HTTP protocol",
@@ -84,6 +88,7 @@ impl Simple {
                 "URL pattern `{}` does not contain the ID placeholder `{}`",
                 pattern, ID_PLACEHOLDER).into());
         }
+
         Ok(())
     }
 }
@@ -92,6 +97,11 @@ impl Simple {
 #[cfg(test)]
 impl Simple {
     pub fn html_url_regex(&self) -> &Regex { &self.html_url_re }
+
+    /// Returns the scheme + domain part of HTML URLs, like: http://example.com
+    pub fn html_url_prefix(&self) -> String {
+        Url::parse(self.html_url_pattern).unwrap().origin().ascii_serialization()
+    }
 }
 
 impl Host for Simple {

@@ -29,7 +29,8 @@ mod tests {
 
     #[test]
     fn html_url_regex() {
-        let html_url: String = "http://pastebin.com".into();
+        let host = create();
+        let html_url: String = host.html_url_prefix();
 
         let valid_html_urls: Vec<(/* URL */ String,
                                   /* ID */ &'static str)> = vec![
@@ -48,7 +49,6 @@ mod tests {
             "foobar".into(),                        // not even an URL
         ];
 
-        let host = create();
         let html_url_re = host.html_url_regex();
         for (ref valid_url, id) in valid_html_urls {
             let captures = html_url_re.captures(valid_url)
