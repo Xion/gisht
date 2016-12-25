@@ -13,7 +13,7 @@ pub fn create() -> Simple {
     Simple::new(ID, "lpaste.net",
                 "http://lpaste.net/raw/${id}",
                 "http://lpaste.net/${id}",
-                Regex::new("[0-9]+").unwrap())
+                Regex::new("[0-9]+").unwrap()).unwrap()
 }
 
 

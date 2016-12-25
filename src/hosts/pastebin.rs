@@ -19,7 +19,7 @@ pub fn create() -> Simple {
     Simple::new(ID, "Pastebin.com",
                 "http://pastebin.com/raw/${id}",
                 "http://pastebin.com/${id}",
-                Regex::new("[0-9a-zA-Z]+").unwrap())
+                Regex::new("[0-9a-zA-Z]+").unwrap()).unwrap()
 }
 
 

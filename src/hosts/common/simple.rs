@@ -1,6 +1,7 @@
 //! Module implementing a generic simple gist host.
 
 use std::borrow::Cow;
+use std::error::Error;
 use std::fs;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::Path;
@@ -53,9 +54,9 @@ impl Simple {
                name: &'static str,
                raw_url_pattern: &'static str,
                html_url_pattern: &'static str,
-               gist_id_re: Regex) -> Self {
-        Self::check_url_pattern(raw_url_pattern);
-        Self::check_url_pattern(html_url_pattern);
+               gist_id_re: Regex) -> Result<Self, Box<Error>> {
+        try!(Self::check_url_pattern(raw_url_pattern));
+        try!(Self::check_url_pattern(html_url_pattern));
 
         // Create regex for matching HTML URL by replacing the ID placeholder
         // with a named capture group.
@@ -63,21 +64,27 @@ impl Simple {
             regex::quote(html_url_pattern).replace(
                 &regex::quote(ID_PLACEHOLDER), &format!("(?P<id>{})", gist_id_re.as_str())));
 
-        Simple {
+        Ok(Simple {
             id: id,
             name: name,
             raw_url_pattern: raw_url_pattern,
             html_url_pattern: html_url_pattern,
-            html_url_re: Regex::new(&html_url_re).unwrap(),
-        }
+            html_url_re: try!(Regex::new(&html_url_re)),
+        })
     }
 
-    fn check_url_pattern(pattern: &'static str) {
-        assert!([HTTP, HTTPS].iter().any(|p| pattern.starts_with(p)),
-            "URL pattern `{}` doesn't start with a known HTTP protocol");
-        assert!(pattern.contains(ID_PLACEHOLDER),
-            "URL pattern `{}` does not contain the ID placeholder `{}`",
-            pattern, ID_PLACEHOLDER)
+    fn check_url_pattern(pattern: &'static str) -> Result<(), Box<Error>> {
+        if ![HTTP, HTTPS].iter().any(|p| pattern.starts_with(p)) {
+            return Err(format!(
+                "URL pattern `{}` doesn't start with a known HTTP protocol",
+                pattern).into());
+        }
+        if !pattern.contains(ID_PLACEHOLDER) {
+            return Err(format!(
+                "URL pattern `{}` does not contain the ID placeholder `{}`",
+                pattern, ID_PLACEHOLDER).into());
+        }
+        Ok(())
     }
 }
 
