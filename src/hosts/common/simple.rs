@@ -1,9 +1,5 @@
 //! Module implementing a generic simple gist host.
 
-pub mod lpaste;
-pub mod pastebin;
-
-
 use std::borrow::Cow;
 use std::fs;
 use std::io::{self, BufRead, BufReader, Write};
@@ -13,10 +9,10 @@ use hyper::client::{Client, Response};
 use hyper::header::UserAgent;
 use regex::{self, Regex};
 
-use super::super::USER_AGENT;
+use ::USER_AGENT;
 use gist::{self, Gist};
+use hosts::{FetchMode, Host};
 use util::{LINESEP, mark_executable, symlink_file};
-use super::{FetchMode, Host};
 
 
 /// Placeholder for gist IDs in URL patterns.
@@ -85,8 +81,8 @@ impl Simple {
     }
 }
 
-// Accessors / getters.
-// These are mostly used for testing of individual host setups.
+// Accessors / getters, used for testing of individual host setups.
+#[cfg(test)]
 impl Simple {
     pub fn html_url_regex(&self) -> &Regex { &self.html_url_re }
 }

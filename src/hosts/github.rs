@@ -19,7 +19,7 @@ use regex::{self, Regex};
 use rustc_serialize::json::Json;
 use url::Url;
 
-use super::super::USER_AGENT;
+use ::USER_AGENT;
 use ext::hyper::header::Link;
 use gist::{self, Datum, Gist};
 use util::{mark_executable, symlink_file};

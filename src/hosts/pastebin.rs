@@ -8,7 +8,7 @@
 
 use regex::Regex;
 
-use super::Simple;
+use hosts::common::Simple;
 
 
 /// pastebin.com host ID.

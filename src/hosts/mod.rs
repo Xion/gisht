@@ -4,8 +4,11 @@
 //! of code to share with others. gist.github.com is a prime example; others are the various
 //! "pastebins", including the pastebin.com namesake.
 
+mod common;
+
 mod github;
-mod simple;
+mod lpaste;
+mod pastebin;
 
 
 use std::collections::HashMap;
@@ -13,7 +16,6 @@ use std::io;
 use std::sync::Arc;
 
 use super::gist::{self, Gist};
-use self::simple::*;
 
 
 /// Represents a gists' host: a (web) service that hosts gists (code snippets).
