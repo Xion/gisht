@@ -7,6 +7,7 @@
 mod common;
 
 mod github;
+mod heypasteit;
 mod lpaste;
 mod pastebin;
 
@@ -89,6 +90,7 @@ lazy_static! {
         github::ID => Arc::new(github::GitHub::new()) as Arc<Host>,
         pastebin::ID => Arc::new(pastebin::create()) as Arc<Host>,
         lpaste::ID => Arc::new(lpaste::create()) as Arc<Host>,
+        heypasteit::ID => Arc::new(heypasteit::create()) as Arc<Host>,
     };
 }
 

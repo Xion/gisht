@@ -147,24 +147,7 @@ impl Host for Simple {
 
         // Clean up the URL a little,
         let orig_url = url.to_owned();
-        let url: Cow<str> = {
-            let url = url.trim().trim_right_matches("/");
-
-            //  Convert between HTTPS and HTTP if necessary.
-            let (canonical_proto, other_http_proto);
-            if self.html_url_pattern.starts_with(HTTP) {
-                canonical_proto = HTTP;
-                other_http_proto = HTTPS;
-            } else {
-                canonical_proto = HTTPS;
-                other_http_proto = HTTPS;
-            }
-            if url.starts_with(other_http_proto) {
-                format!("{}{}", canonical_proto, url.trim_left_matches(other_http_proto)).into()
-            } else {
-                url.into()
-            }
-        };
+        let url = self.sanitize_url(url);
 
         // Check if it matches the pattern of gist's page URLs.
         let captures = match self.html_url_re.captures(&*url) {
@@ -243,7 +226,42 @@ impl Simple {
     }
 }
 
-// Utility methods.
+// Resolving gist URLs.
+impl Simple {
+    fn sanitize_url<'u>(&self, url: &'u str) -> Cow<'u, str> {
+        let mut url = Cow::Borrowed(url.trim().trim_right_matches("/"));
+
+        //  Convert between HTTPS and HTTP if necessary.
+        let (canonical_proto, other_http_proto);
+        if self.html_url_pattern.starts_with(HTTP) {
+            canonical_proto = HTTP;
+            other_http_proto = HTTPS;
+        } else {
+            canonical_proto = HTTPS;
+            other_http_proto = HTTPS;
+        }
+        url = if url.starts_with(other_http_proto) {
+            format!("{}{}", canonical_proto, url.trim_left_matches(other_http_proto)).into()
+        } else {
+            url.into()
+        };
+
+        // Add or remove "www".
+        let canonical_has_www = self.html_url_pattern.contains("://www.");
+        let input_has_www = url.contains("://www");
+        if canonical_has_www != input_has_www {
+            url = if canonical_has_www {
+                url.replace("://", "://www.").into()
+            } else {
+                url.replace("://www.", "://").into()
+            };
+        };
+
+        url
+    }
+}
+
+// Other utility methods.
 impl Simple {
     /// Check if given Gist is for this host. Invoke using try!().
     fn ensure_host_id(&self, gist: &Gist) -> io::Result<()> {
