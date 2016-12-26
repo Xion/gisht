@@ -4,22 +4,22 @@
 //!
 //! Although they have an API and there are pastebin user accounts,
 //! user names are not a part of pastes' URLs,
-//! which is why it can be implemented as a Simple gist host.
+//! which is why it can be implemented as a Basic gist host.
 
 use regex::Regex;
 
-use hosts::common::Simple;
+use hosts::common::Basic;
 
 
 /// pastebin.com host ID.
 pub const ID: &'static str = "pb";
 
 /// Create the Pastebin Host implementation.
-pub fn create() -> Simple {
-    Simple::new(ID, "Pastebin.com",
-                "http://pastebin.com/raw/${id}",
-                "http://pastebin.com/${id}",
-                Regex::new("[0-9a-zA-Z]+").unwrap()).unwrap()
+pub fn create() -> Basic {
+    Basic::new(ID, "Pastebin.com",
+               "http://pastebin.com/raw/${id}",
+               "http://pastebin.com/${id}",
+               Regex::new("[0-9a-zA-Z]+").unwrap()).unwrap()
 }
 
 

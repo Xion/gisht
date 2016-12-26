@@ -1,19 +1,19 @@
-//! Module implementing bpaste.net as simple gist host.
+//! Module implementing bpaste.net as Basic gist host.
 
 use regex::Regex;
 
-use hosts::common::Simple;
+use hosts::common::Basic;
 
 
 /// bpaste.net host ID.
 pub const ID: &'static str = "bp";
 
 /// Create the bpaste.net Host implementation.
-pub fn create() -> Simple {
-    Simple::new(ID, "bpaste.net",
-                "http://bpaste.net/raw/${id}",
-                "http://bpaste.net/show/${id}",
-                Regex::new("[0-9a-z]+").unwrap()).unwrap()
+pub fn create() -> Basic {
+    Basic::new(ID, "bpaste.net",
+               "http://bpaste.net/raw/${id}",
+               "http://bpaste.net/show/${id}",
+               Regex::new("[0-9a-z]+").unwrap()).unwrap()
 }
 
 

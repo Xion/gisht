@@ -3,18 +3,18 @@
 
 use regex::Regex;
 
-use hosts::common::Simple;
+use hosts::common::Basic;
 
 
 /// heypasteit.com host ID.
 pub const ID: &'static str = "hpi";
 
 /// Create the heypasteit.com Host implementation.
-pub fn create() -> Simple {
-    Simple::new(ID, "heypasteit.com",
-                "http://heypasteit.com/download/${id}",
-                "http://heypasteit.com/clip/${id}",
-                Regex::new("[0-9A-Z]+").unwrap()).unwrap()
+pub fn create() -> Basic {
+    Basic::new(ID, "heypasteit.com",
+               "http://heypasteit.com/download/${id}",
+               "http://heypasteit.com/clip/${id}",
+               Regex::new("[0-9A-Z]+").unwrap()).unwrap()
 }
 
 

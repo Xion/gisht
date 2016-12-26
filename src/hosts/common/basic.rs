@@ -1,4 +1,4 @@
-//! Module implementing a generic simple gist host.
+//! Module implementing a basic gist host.
 
 use std::borrow::Cow;
 use std::error::Error;
@@ -25,9 +25,9 @@ const HTTP: &'static str = "http://";
 const HTTPS: &'static str = "https://";
 
 
-/// Generic simple gist host.
+/// Basic gist host.
 ///
-/// This simplicity is based upon the following assumptions:
+/// The implementation is based upon the following assumptions:
 /// * Every gist consists of a single file only
 /// * Gists are only downloaded once and never need to be updated
 /// * Gists are identified by their ID only,
@@ -36,7 +36,7 @@ const HTTPS: &'static str = "https://";
 /// As it turns out, a surprising number of actual gist hosts fit this description,
 /// including the popular ones such pastebin.com.
 #[derive(Debug)]
-pub struct Simple {
+pub struct Basic {
     /// ID of the gist host.
     pub id: &'static str,
     /// User-visible name of the gist host.
@@ -50,7 +50,7 @@ pub struct Simple {
 }
 
 // Creation functions.
-impl Simple {
+impl Basic {
     // TODO: use the Builder pattern
     pub fn new(id: &'static str,
                name: &'static str,
@@ -66,7 +66,7 @@ impl Simple {
             regex::quote(html_url_pattern).replace(
                 &regex::quote(ID_PLACEHOLDER), &format!("(?P<id>{})", gist_id_re.as_str())));
 
-        Ok(Simple {
+        Ok(Basic {
             id: id,
             name: name,
             raw_url_pattern: raw_url_pattern,
@@ -96,7 +96,7 @@ impl Simple {
 
 // Accessors / getters, used for testing of individual host setups.
 #[cfg(test)]
-impl Simple {
+impl Basic {
     pub fn html_url_regex(&self) -> &Regex { &self.html_url_re }
 
     /// Returns the scheme + domain part of HTML URLs, like: http://example.com
@@ -105,10 +105,10 @@ impl Simple {
     }
 }
 
-impl Host for Simple {
+impl Host for Basic {
     fn name(&self) -> &'static str { self.name }
 
-    // Fetch the gist content from remote host
+    /// Fetch the gist content from remote host
     /// and crate the appropriate binary symlink.
     fn fetch_gist(&self, gist: &Gist, mode: FetchMode) -> io::Result<()> {
         try!(self.ensure_host_id(gist));
@@ -163,7 +163,7 @@ impl Host for Simple {
         debug!("URL {} points to a {} gist: ID={}", orig_url, self.name, id);
 
         // Return the resolved gist.
-        // In the gist URI, the ID is also used as name, since simple gists
+        // In the gist URI, the ID is also used as name, since basic gists
         // do not have an independent, user-provided name.
         let uri = gist::Uri::from_name(self.id, id).unwrap();
         let gist = Gist::from_uri(uri).with_id(id);
@@ -174,7 +174,7 @@ impl Host for Simple {
 }
 
 // Fetching gists.
-impl Simple {
+impl Basic {
     /// Return a "resolved" Gist that has the host ID associated with it.
     fn resolve_gist<'g>(&self, gist: &'g Gist) -> Cow<'g, Gist> {
         debug!("Resolving {} gist: {:?}", self.name, gist);
@@ -182,7 +182,7 @@ impl Simple {
         match gist.id {
             Some(_) => gist,
             None => {
-                // Simple gists do actually contain the ID, but it's parsed as `name` part
+                // Basic gists do actually contain the ID, but it's parsed as `name` part
                 // of the URI. (The gists do not have independent, user-provided names).
                 // So all we need to do is to just copy that ID.
                 let id = gist.uri.name.clone();
@@ -203,7 +203,7 @@ impl Simple {
             .send().unwrap();
 
         // Save it under the gist path.
-        // Note that Gist::path for simple gists points to a single file, not a directory,
+        // Note that Gist::path for basic gists points to a single file, not a directory,
         // so we need to ensure its *parent* exists.
         let path = gist.path();
         debug!("Saving gist {} as {}", gist.uri, path.display());
@@ -228,7 +228,7 @@ impl Simple {
 }
 
 // Resolving gist URLs.
-impl Simple {
+impl Basic {
     fn sanitize_url<'u>(&self, url: &'u str) -> Cow<'u, str> {
         let mut url = Cow::Borrowed(url.trim().trim_right_matches("/"));
 
@@ -264,7 +264,7 @@ impl Simple {
 }
 
 // Other utility methods.
-impl Simple {
+impl Basic {
     /// Check if given Gist is for this host. Invoke using try!().
     fn ensure_host_id(&self, gist: &Gist) -> io::Result<()> {
         if gist.uri.host_id != self.id {
@@ -303,7 +303,7 @@ fn write_http_response_file<P: AsRef<Path>>(response: &mut Response, path: P) ->
 #[cfg(test)]
 mod tests {
     use regex::Regex;
-    use super::Simple;
+    use super::Basic;
 
     const ID: &'static str = "foo";
     const NAME: &'static str = "Foo";
@@ -313,25 +313,25 @@ mod tests {
 
     #[test]
     fn invalid_raw_url() {
-        let error = Simple::new(
+        let error = Basic::new(
             ID, NAME, "invalid", "http://example.com/${id}", ID_RE.clone()).unwrap_err();
         assert!(format!("{}", error).contains("URL"));
 
-        let error = Simple::new(ID, NAME,
-                                "http://example.com/nolaceholder",
-                                "http://example.com/${id}", ID_RE.clone()).unwrap_err();
+        let error = Basic::new(ID, NAME,
+                               "http://example.com/nolaceholder",
+                               "http://example.com/${id}", ID_RE.clone()).unwrap_err();
         assert!(format!("{}", error).contains("placeholder"));
     }
 
     #[test]
     fn invalid_html_url() {
-        let error = Simple::new(
+        let error = Basic::new(
             ID, NAME, "http://example.com/${id}", "invalid", ID_RE.clone()).unwrap_err();
         assert!(format!("{}", error).contains("URL"));
 
-        let error = Simple::new(ID, NAME,
-                                "http://example.com/${id}",
-                                "http://example.com/nolaceholder", ID_RE.clone()).unwrap_err();
+        let error = Basic::new(ID, NAME,
+                               "http://example.com/${id}",
+                               "http://example.com/nolaceholder", ID_RE.clone()).unwrap_err();
         assert!(format!("{}", error).contains("placeholder"));
     }
 }

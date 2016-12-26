@@ -1,6 +1,6 @@
 //! Module implementing common gist host patterns, shared by multiple actual hosts.
 
-mod simple;
+mod basic;
 
 
-pub use self::simple::Simple;
+pub use self::basic::Basic;

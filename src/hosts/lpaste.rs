@@ -1,19 +1,19 @@
-//! Module implementing lpaste.net as simple gist host.
+//! Module implementing lpaste.net as Basic gist host.
 
 use regex::Regex;
 
-use hosts::common::Simple;
+use hosts::common::Basic;
 
 
 /// lpaste.net host ID.
 pub const ID: &'static str = "lp";
 
 /// Create the lpaste.net Host implementation.
-pub fn create() -> Simple {
-    Simple::new(ID, "lpaste.net",
-                "http://lpaste.net/raw/${id}",
-                "http://lpaste.net/${id}",
-                Regex::new("[0-9]+").unwrap()).unwrap()
+pub fn create() -> Basic {
+    Basic::new(ID, "lpaste.net",
+               "http://lpaste.net/raw/${id}",
+               "http://lpaste.net/${id}",
+               Regex::new("[0-9]+").unwrap()).unwrap()
 }
 
 
