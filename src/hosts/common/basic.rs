@@ -38,7 +38,7 @@ const HTTPS: &'static str = "https://";
 #[derive(Debug)]
 pub struct Basic {
     /// ID of the gist host.
-    pub id: &'static str,
+    id: &'static str,
     /// User-visible name of the gist host.
     name: &'static str,
     /// Pattern for "raw" URLs used to download gists.
@@ -106,6 +106,7 @@ impl Basic {
 }
 
 impl Host for Basic {
+    fn id(&self) -> &'static str { self.id }
     fn name(&self) -> &'static str { self.name }
 
     /// Fetch the gist content from remote host
@@ -288,14 +289,17 @@ fn write_http_response_file<P: AsRef<Path>>(response: &mut Response, path: P) ->
     // Read the response line-by-line and write it to the file
     // with an OS-specific line separator.
     let reader = BufReader::new(response);
-    let mut line_count = 0;
+    let (mut line_count, mut byte_count) = (0, 0);
     for line in reader.lines() {
         let line = try!(line);
-        try!(file.write_fmt(format_args!("{}{}", line, LINESEP)));
+        try!(file.write_fmt(format_args!("{}{}", line, LINESEP))
+            .map_err(|e| io::Error::new(e.kind(),
+                format!("Couldn't write file {}: {}", path.display(), e))));
         line_count += 1;
+        byte_count += line.len();
     }
 
-    trace!("Wrote {} line(s) to {}", line_count, path.display());
+    trace!("Wrote {} line(s) ({} byte(s)) to {}", line_count, byte_count, path.display());
     Ok(())
 }
 

@@ -42,6 +42,7 @@ impl GitHub {
 }
 
 impl Host for GitHub {
+    fn id(&self) -> &'static str { ID }
     fn name(&self) -> &str { "GitHub" }
 
     /// Fetch the gist's repo from GitHub & create the appropriate binary symlink.

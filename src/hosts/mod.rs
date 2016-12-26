@@ -23,7 +23,9 @@ use super::gist::{self, Gist};
 /// Represents a gists' host: a (web) service that hosts gists (code snippets).
 /// Examples include gist.github.com.
 pub trait Host : Send + Sync {
-    // Returns a user-visible name of the gists' host.
+    /// Returns a unique identifier of the gist Host.
+    fn id(&self) -> &'static str;
+    /// Returns a user-visible name of the gists' host.
     fn name(&self) -> &str;
 
     /// Fetch a current version of the gist if necessary.
@@ -102,6 +104,13 @@ pub const DEFAULT_HOST_ID: &'static str = github::ID;
 #[cfg(test)]
 mod tests {
     use super::{DEFAULT_HOST_ID, HOSTS};
+
+    #[test]
+    fn consistent_hosts() {
+        for (&id, host) in &*HOSTS {
+            assert_eq!(id, host.id());
+        }
+    }
 
     #[test]
     fn default_host_id() {
