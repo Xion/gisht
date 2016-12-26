@@ -97,3 +97,15 @@ lazy_static! {
 }
 
 pub const DEFAULT_HOST_ID: &'static str = github::ID;
+
+
+#[cfg(test)]
+mod tests {
+    use super::{DEFAULT_HOST_ID, HOSTS};
+
+    #[test]
+    fn default_host_id() {
+        assert!(HOSTS.contains_key(DEFAULT_HOST_ID),
+            "Default host ID `{}` doesn't occur among known gist hosts", DEFAULT_HOST_ID);
+    }
+}

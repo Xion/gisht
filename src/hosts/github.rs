@@ -311,11 +311,18 @@ fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
         None => {
             trace!("Need to get clone URL from GitHub for gist {}", gist.uri);
             let info = try!(get_gist_info(&gist.id.as_ref().unwrap()));
-            let url = info["git_pull_url"].as_string().unwrap().to_owned();
+            let url = match info.find("git_pull_url").and_then(|u| u.as_string()) {
+                Some(url) => url.to_owned(),
+                None => {
+                    error!("Gist info for {} doesn't contain git_pull_url", gist.uri);
+                    return Err(io::Error::new(io::ErrorKind::InvalidData,
+                        format!("Couldn't retrieve git_pull_url for gist {}", gist.uri)));
+                },
+            };
             trace!("GitHub gist #{} has a git_pull_url=\"{}\"",
-                info["id"].as_string().unwrap(), url);
+                gist.id.as_ref().unwrap(), url);
             url
-        }
+        },
     };
 
     // Create the gist's directory and clone it as a Git repo there.
@@ -349,6 +356,7 @@ fn iter_gists(owner: &str) -> GistsIterator {
 }
 
 /// Iterator over gists belonging to a particular owner.
+#[derive(Debug)]
 struct GistsIterator<'o> {
     owner: &'o str,
     // Iteration state.

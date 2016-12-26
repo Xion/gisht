@@ -238,6 +238,7 @@ impl Simple {
             canonical_proto = HTTP;
             other_http_proto = HTTPS;
         } else {
+            assert!(self.html_url_pattern.starts_with(HTTPS));
             canonical_proto = HTTPS;
             other_http_proto = HTTPS;
         }
