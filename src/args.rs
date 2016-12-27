@@ -42,7 +42,8 @@ pub fn parse_from_argv<I, T>(argv: I) -> Result<Options, ArgsError>
             .find(|arg| !arg.starts_with("-"));
 
         // (That is, provided we got a positional argument at all).
-        if let Some(first_arg) = maybe_first_arg {
+        let first_arg = maybe_first_arg.unwrap_or_else(|| "help".into());
+        if first_arg != "help" {
             match Command::from_str(&first_arg) {
                 Ok(_) => create_full_parser(),
                 Err(_) => {
@@ -54,7 +55,7 @@ pub fn parse_from_argv<I, T>(argv: I) -> Result<Options, ArgsError>
                 },
             }
         } else {
-            // If we only got flag arguments, use the full parser (with subcommands).
+            // If help was requested, use the full parser (with subcommands).
             // This ensure the correct help/usage instructions are shown.
             create_full_parser()
         }
@@ -422,6 +423,7 @@ fn create_parser_base<'p>() -> Parser<'p> {
 fn subcommand_for<'p>(command: Command) -> Parser<'p> {
     SubCommand::with_name(command.name())
         .visible_aliases(command.aliases())
+        .help_short("H")
 }
 
 /// Configure a parser for the "run" command.
