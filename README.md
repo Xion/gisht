@@ -25,11 +25,11 @@ Magic!
         -V, --version    Prints version information
     
     SUBCOMMANDS:
-        run      Run the specified gist
+        run      Run the specified gist [aliases: exec]
         which    Output the path to gist's binary
-        print    Print the source code of gist's binary
-        open     Open the gist's webpage
-        info     Display summary information about the gist
+        print    Print the source code of gist's binary [aliases: cat]
+        open     Open the gist's webpage [aliases: show]
+        info     Display summary information about the gist [aliases: stat]
         help     Prints this message or the help of the given subcommand(s)
     
     Hint: `gisht run GIST` can be shortened to just `gisht GIST`.

@@ -274,6 +274,8 @@ custom_derive! {
 }
 
 impl Command {
+    /// Canonical name of this command.
+    /// This is the name that the command will be shown under in the usage/help text.
     fn name(&self) -> &'static str {
         match *self {
             Command::Run => "run",
@@ -281,6 +283,25 @@ impl Command {
             Command::Print => "print",
             Command::Open => "open",
             Command::Info => "info",
+        }
+    }
+
+    /// Aliases (alternative names) for this command.
+    /// These aliases are visible in the application's help message.
+    fn aliases(&self) -> &'static [&'static str] {
+        // Each possible result needs to have it's own named constant
+        // because otherwise Rust cannot make them properly 'static -_-
+        const RUN_ALIASES: &'static [&'static str] = &["exec"];
+        const PRINT_ALIASES: &'static [&'static str] = &["cat"];
+        const OPEN_ALIASES: &'static [&'static str] = &["show"];
+        const INFO_ALIASES: &'static [&'static str] = &["stat"];
+
+        match *self {
+            Command::Run => RUN_ALIASES,
+            Command::Print => PRINT_ALIASES,
+            Command::Open => OPEN_ALIASES,
+            Command::Info => INFO_ALIASES,
+            _ => &[],
         }
     }
 }
@@ -294,14 +315,12 @@ impl FromStr for Command {
 
     /// Create a Command from the result of clap::ArgMatches::subcommand_name().
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "run" => Ok(Command::Run),
-            "which" => Ok(Command::Which),
-            "print" => Ok(Command::Print),
-            "open" => Ok(Command::Open),
-            "info" => Ok(Command::Info),
-            _ => Err(Unrepresentable(s.to_owned())),
+        for command in Command::iter_variants() {
+            if command.name() == s || command.aliases().contains(&s) {
+                return Ok(command);
+            }
         }
+        Err(Unrepresentable(s.to_owned()))
     }
 }
 
@@ -335,18 +354,18 @@ fn create_full_parser<'p>() -> Parser<'p> {
         .setting(AppSettings::VersionlessSubcommands)
 
         .subcommand(configure_run_gist_parser(
-            SubCommand::with_name(Command::Run.name())
+            subcommand_for(Command::Run)
                 .about("Run the specified gist")))
-        .subcommand(SubCommand::with_name(Command::Which.name())
+        .subcommand(subcommand_for(Command::Which)
             .about("Output the path to gist's binary")
             .arg(gist_arg("Gist to locate")))
-        .subcommand(SubCommand::with_name(Command::Print.name())
+        .subcommand(subcommand_for(Command::Print)
             .about("Print the source code of gist's binary")
             .arg(gist_arg("Gist to print")))
-        .subcommand(SubCommand::with_name(Command::Open.name())
+        .subcommand(subcommand_for(Command::Open)
             .about("Open the gist's webpage")
             .arg(gist_arg("Gist to open")))
-        .subcommand(SubCommand::with_name(Command::Info.name())
+        .subcommand(subcommand_for(Command::Info)
             .about("Display summary information about the gist")
             .arg(gist_arg("Gist to display info on")))
 
@@ -397,6 +416,12 @@ fn create_parser_base<'p>() -> Parser<'p> {
 
         .help_short("H")
         .version_short("V")
+}
+
+/// Create a clap subcommand Parser object for given gist Command.
+fn subcommand_for<'p>(command: Command) -> Parser<'p> {
+    SubCommand::with_name(command.name())
+        .visible_aliases(command.aliases())
 }
 
 /// Configure a parser for the "run" command.
