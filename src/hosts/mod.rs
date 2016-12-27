@@ -10,6 +10,7 @@ mod github;
 mod bpaste;
 mod heypasteit;
 mod lpaste;
+mod mozilla;
 mod pastebin;
 
 
@@ -95,6 +96,7 @@ lazy_static! {
         lpaste::ID => Arc::new(lpaste::create()) as Arc<Host>,
         heypasteit::ID => Arc::new(heypasteit::create()) as Arc<Host>,
         bpaste::ID => Arc::new(bpaste::create()) as Arc<Host>,
+        mozilla::ID => Arc::new(mozilla::create()) as Arc<Host>,
     };
 }
 
