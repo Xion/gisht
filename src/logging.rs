@@ -6,7 +6,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::env;
-use std::io::{self, Write};
+use std::io;
 
 use ansi_term::{Colour, Style};
 use isatty;
@@ -41,7 +41,8 @@ const NEGATIVE_VERBOSITY_LEVELS: &'static [FilterLevel] = &[
 /// Initialize logging with given verbosity.
 /// The verbosity value has the same meaning as in args::Options::verbosity.
 pub fn init(verbosity: isize) -> Result<(), SetLoggerError> {
-    let stderr = slog_stream::stream(io::stderr(), LogFormat);
+    let istty = cfg!(unix) && isatty::stderr_isatty();
+    let stderr = slog_stream::stream(io::stderr(), LogFormat{tty: istty});
 
     // Determine the log filtering level based on verbosity.
     // If the argument is excessive, log that but clamp to the highest/lowest log level.
@@ -93,15 +94,15 @@ pub fn init(verbosity: isize) -> Result<(), SetLoggerError> {
 // Log formatting
 
 /// Token type that's only uses to tell slog-stream how to format our log entries.
-struct LogFormat;
+struct LogFormat {
+    pub tty: bool,
+}
 
 impl slog_stream::Format for LogFormat {
     /// Format a single log Record and write it to given output.
-    fn format(&self, _: &mut io::Write,
+    fn format(&self, output: &mut io::Write,
               record: &slog::Record,
               _logger_kvp: &slog::OwnedKeyValueList) -> io::Result<()> {
-        let istty = cfg!(unix) && isatty::stderr_isatty();
-
         // Format the higher level (more fine-grained) messages with greater detail,
         // as they are only visible when user explicitly enables verbose logging.
         let msg = if record.level() > DEFAULT_LEVEL {
@@ -119,12 +120,12 @@ impl slog_stream::Format for LogFormat {
             };
             // Dim the prefix (everything that's not a message)
             // if we're outputting to a Unix terminal.
-            let prefix_style = if istty { *TTY_FINE_PREFIX_STYLE } else { Style::default() };
+            let prefix_style = if self.tty { *TTY_FINE_PREFIX_STYLE } else { Style::default() };
             let prefix = format!("{}{} {}#{}]", level, logtime, module, record.line());
             format!("{} {}\n", prefix_style.paint(prefix), record.msg())
         } else {
             // Colorize the level label if we're outputting to a Unix terminal.
-            let level: Cow<str> = if istty {
+            let level: Cow<str> = if self.tty {
                 let style = TTY_LEVEL_STYLES.get(&record.level().as_usize())
                     .cloned()
                     .unwrap_or_else(Style::default);
@@ -135,7 +136,7 @@ impl slog_stream::Format for LogFormat {
             format!("{}: {}\n", level, record.msg())
         };
 
-        try!(io::stderr().write_all(msg.as_bytes()));
+        try!(output.write_all(msg.as_bytes()));
         Ok(())
     }
 }
