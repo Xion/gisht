@@ -453,13 +453,40 @@ fn gist_arg(help: &'static str) -> Arg {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use std::str::FromStr;
     use super::{Command, create_full_parser, parse_from_argv};
 
     #[test]
-    fn command_names() {
+    fn command_aliases_distinct_from_name() {
+        for cmd in Command::iter_variants() {
+            assert!(!cmd.aliases().contains(&cmd.name()),
+                "Aliases for '{}' command include its canonical name", cmd.name());
+        }
+    }
+
+    #[test]
+    fn command_aliases_not_duplicated() {
+        for cmd in Command::iter_variants() {
+            assert_eq!(cmd.aliases().len(),
+                       cmd.aliases().iter().collect::<HashSet<_>>().len(),
+                "Command '{}' has duplicate aliases", cmd.name());
+        }
+    }
+
+    #[test]
+    fn command_from_name() {
         for cmd in Command::iter_variants() {
             assert_eq!(cmd, Command::from_str(cmd.name()).unwrap());
+        }
+    }
+
+    #[test]
+    fn command_from_alias() {
+        for cmd in Command::iter_variants() {
+            for alias in cmd.aliases() {
+                assert_eq!(cmd, Command::from_str(alias).unwrap());
+            }
         }
     }
 
@@ -468,9 +495,9 @@ mod tests {
     fn commands_in_usage() {
         // Usage will be returned as a failed parse Error's message.
         // Empty argument list ensures we actually get the parse error.
-        let args: Vec<&'static str> = vec![];
-        let usage = format!("{}", create_full_parser()
-            .get_matches_from_safe(args).unwrap_err());
+        let mut usage = Vec::new();
+        create_full_parser().write_help(&mut usage).unwrap();
+        let usage = String::from_utf8(usage).unwrap();
 
         for cmd in Command::iter_variants() {
             assert!(usage.contains(cmd.name()),
@@ -489,11 +516,25 @@ mod tests {
     /// Verify that `run` subcommand is optional when running a gist with args.
     #[test]
     fn run_optional_with_args() {
-        let run_opts = parse_from_argv(vec![
+        let run_dashes_opts = parse_from_argv(vec![
             "gisht", "run", "test/test", "--", "some", "arg"]).unwrap();
-        let no_run_opts = parse_from_argv(vec![
+        let no_run_dashes_opts = parse_from_argv(vec![
             "gisht", "test/test", "--", "some", "arg"]).unwrap();
-        assert_eq!(run_opts, no_run_opts);
+        let run_no_dashes_opts = parse_from_argv(vec![
+            "gisht", "run", "test/test", "some", "arg"]).unwrap();
+        let no_run_no_dashes_opts = parse_from_argv(vec![
+            "gisht", "test/test", "--", "some", "arg"]).unwrap();
+
+        // Everything should be equal to each other.
+        let all_opts = vec![run_dashes_opts,
+                            no_run_dashes_opts,
+                            run_no_dashes_opts,
+                            no_run_no_dashes_opts];
+        for opts1 in &all_opts {
+            for opts2 in &all_opts {
+                assert_eq!(opts1, opts2);
+            }
+        }
     }
 
     /// Verify that args can only be provided for the `run` subcommand.
@@ -513,5 +554,13 @@ mod tests {
         let args = vec!["gisht", "run", gist_uri];
         assert!(parse_from_argv(args).is_err(),
             "Gist URI `{}` should cause a parse error but didn't", gist_uri);
+    }
+
+    // Verify that "help" command correctly shows help.
+    #[test]
+    fn help_works() {
+        let args = vec!["gisht", "help"];
+        assert!(parse_from_argv(args).is_err(),
+            "\"help\" command was incorrectly treated as gist command");
     }
 }
