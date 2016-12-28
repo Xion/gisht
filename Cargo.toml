@@ -9,7 +9,7 @@ license = "GPLv3"
 
 [dependencies]
 ansi_term = "0.9"
-clap = { version = "2.16.2", features = ["suggestions"] }
+clap = { version = "2.19.2", features = ["suggestions"] }
 conv = "0.3"
 custom_derive = "*"
 enum_derive = "*"
