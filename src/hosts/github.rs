@@ -270,12 +270,29 @@ fn update_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
     assert!(path.exists(), "Directory for gist {} doesn't exist!", gist.uri);
 
     debug!("Updating GitHub gist {}...", gist.uri);
-    if let Err(err) = git_pull(&path, "origin", /* reflog_msg */ Some("gisht-update")) {
+    let reflog_msg = Some("gisht-update");
+    if let Err(err) = git_pull(&path, "origin", reflog_msg) {
         match err.code() {
             git2::ErrorCode::Conflict => {
                 warn!("Conflict occurred when updating gist {}, rolling back...", gist.uri);
                 try!(git_reset_merge(&path).map_err(git_to_io_error));
                 debug!("Conflicting update of gist {} successfully aborted", gist.uri);
+            },
+            git2::ErrorCode::Uncommitted => {
+                // This happens if the user has themselves modified the gist
+                // and their changes would be overwritten by the merge.
+                // There isn't much we can do in such a case,
+                // as it would lead to loss of user's modifications.
+                error!("Uncommitted changes found to local copy of gist {}", gist.uri);
+                return Err(git_to_io_error(err));
+            },
+            git2::ErrorCode::Unmerged => {
+                // This may happen if previous versions of the application
+                // (which didn't handle merge conflicts) has left a mess.
+                warn!("Previous unfinished Git merge prevented update of gist {}", gist.uri);
+                debug!("Attempting to rollback old Git merge of gist {}...", gist.uri);
+                try!(git_reset_merge(&path).map_err(git_to_io_error));
+                info!("Old Git merge of gist {} successfully aborted", gist.uri);
             },
             _ => return Err(git_to_io_error(err)),
         }
