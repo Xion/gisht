@@ -548,15 +548,14 @@ fn build_gist_info(info: &Json, data: &[Datum]) -> gist::Info {
 /// The gist name is defined to be the name of its first file,
 /// as this is how GitHub page itself picks it.
 fn gist_name_from_info(info: &Json) -> Option<&str> {
-    info.find("files").and_then(|fs| fs.as_object()).and_then(|files| {
-        let mut filenames: Vec<_> = files.keys().map(|s| s as &str).collect();
-        if filenames.is_empty() {
-            None
-        } else {
-            filenames.sort();
-            Some(filenames[0])
-        }
-    })
+    let files = try_opt!(info.find("files").and_then(|fs| fs.as_object()));
+    let mut filenames: Vec<_> = files.keys().map(|s| s as &str).collect();
+    if filenames.is_empty() {
+        None
+    } else {
+        filenames.sort();
+        Some(filenames[0])
+    }
 }
 
 /// Retrieve gist owner from the parsed JSON of gist info.
