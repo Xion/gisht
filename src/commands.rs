@@ -44,7 +44,7 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
             if let Some(interpreter) = guess_interpreter(&binary) {
                 error = interpreted_run(interpreter, &binary, args);
             } else {
-                error!("Failed to guess an interpereter for gist {}", uri);
+                error!("Failed to guess an interpreter for gist {}", uri);
             }
         }
         panic!("Failed to execute gist {}: {}", uri, error);
@@ -65,17 +65,23 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
 /// Returns the "format string" for the interpreter's command string.
 #[cfg(unix)]
 fn guess_interpreter<P: AsRef<Path>>(binary_path: P) -> Option<&'static str> {
-    let extension = match binary_path.as_ref().extension() {
+    let binary_path = binary_path.as_ref();
+    trace!("Trying to guess an interpreter for {}", binary_path.display());
+
+    let extension = match binary_path.extension() {
         Some(ext) => ext,
         None => {
-            error!("Can't deduce interpreter w/o a binary file extension (got {})",
-                binary_path.as_ref().display());
+            warn!("Can't deduce interpreter w/o a binary file extension (got {})",
+                binary_path.display());
             return None;
         },
     };
 
-    extension.to_str()
-        .and_then(|ext| COMMON_INTERPRETERS.get(&ext).map(|i| *i))
+    let extension = try_opt!(extension.to_str());
+    let interpreter = try_opt!(COMMON_INTERPRETERS.get(&extension));
+    debug!("Guessed the interpreter as `{}`",
+        interpreter.split_whitespace().next().unwrap());
+    Some(interpreter)
 }
 
 /// Execute a script using given interpreter.
@@ -87,9 +93,10 @@ fn interpreted_run<P: AsRef<Path>>(interpreter: &str,
     use std::os::unix::process::CommandExt;
 
     // Format the interpreter-specific command line.
+    let script = script.as_ref();
     let args = args.iter().map(|a| shlex::quote(a)).collect::<Vec<_>>().join(" ");
     let cmd = interpreter.to_owned()
-        .replace("${script}", &script.as_ref().to_string_lossy())
+        .replace("${script}", &script.to_string_lossy())
         .replace("${args}", &args);
 
     // Split the final interpreter-invoking command into "argv"
@@ -100,7 +107,7 @@ fn interpreted_run<P: AsRef<Path>>(interpreter: &str,
 
     // If everything goes well, this will not return.
     let error = command.exec();
-    debug!("Interpreted run of {} failed: {}", script.as_ref().display(), error);
+    debug!("Interpreted run of {} failed: {}", script.display(), error);
     error
 }
 
@@ -140,9 +147,11 @@ pub fn print_gist(gist: &Gist) -> ! {
     let mut buf = [0; BUF_SIZE];
     loop {
         let c = binary.read(&mut buf).unwrap_or_else(|e| {
-            panic!("Falled to read the binary of gist {}: {}", gist.uri, e)
+            panic!("Failed to read the binary of gist {}: {}", gist.uri, e)
         });
-        io::stdout().write_all(&buf[0..c]).unwrap();
+        if c > 0 {
+            io::stdout().write_all(&buf[0..c]).unwrap();
+        }
         if c < BUF_SIZE { break }
     }
     exit(exitcode::EX_OK);
