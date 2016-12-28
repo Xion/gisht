@@ -409,21 +409,17 @@ impl<'o> Iterator for GistsIterator<'o> {
 impl<'o> GistsIterator<'o> {
     /// Retrieve the next Gist from a JSON response that's been received previously.
     fn next_cached(&mut self) -> Option<Gist> {
-        if self.gists_json_array.is_none() {
-            return None;
-        }
-
-        let gists_len = self.gists_json_array.as_ref().unwrap().len();
-        let mut index = self.index;
-        while index < gists_len {
-            let gists = self.gists_json_array.as_ref().unwrap();
-            if let Some(gist) = self.gist_from_json(&gists[index]) {
-                self.index = index + 1;
-                return Some(gist);
+        {
+            let gists = try_opt!(self.gists_json_array.as_ref());
+            let mut index = self.index;
+            while index < gists.len() {
+                if let Some(gist) = self.gist_from_json(&gists[index]) {
+                    self.index = index + 1;
+                    return Some(gist);
+                }
+                index += 1;
             }
-            index += 1;
         }
-
         self.gists_json_array = None;
         self.index = 0;
         None

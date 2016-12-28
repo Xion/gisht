@@ -86,9 +86,12 @@ impl Gist {
     /// Retrieve a specific piece of gist Info, if available.
     #[inline]
     pub fn info(&self, datum: Datum) -> Option<info::Value> {
-        self.info.as_ref().and_then(|info| {
-            if info.has(datum) { Some(info.get(datum).into_owned()) } else { None }
-        })
+        let info = try_opt!(self.info.as_ref());
+        if info.has(datum) {
+            Some(info.get(datum).into_owned())
+        } else {
+            None
+        }
     }
 }
 
