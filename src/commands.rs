@@ -47,7 +47,8 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
                 error!("Failed to guess an interpreter for gist {}", uri);
             }
         }
-        panic!("Failed to execute gist {}: {}", uri, error);
+        error!("Failed to execute gist {}: {}", uri, error);
+        exit(1);
     } else {
         let mut run = command.spawn()
             .unwrap_or_else(|e| panic!("Failed to execute gist {}: {}", uri, e));

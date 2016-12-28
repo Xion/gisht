@@ -61,6 +61,8 @@ impl Host for GitHub {
             };
             if update {
                 try!(update_gist(gist));
+            } else {
+                trace!("No need to update gist {}", gist.uri);
             }
         } else {
             try!(clone_gist(gist));
@@ -186,7 +188,7 @@ lazy_static! {
 
 /// Return a "resolved" Gist that has a GitHub ID associated with it.
 fn resolve_gist(gist: &Gist) -> io::Result<Cow<Gist>> {
-    debug!("Resolving GitHub gist: {}", gist.uri);
+    trace!("Resolving GitHub gist: {}", gist.uri);
     let gist = Cow::Borrowed(gist);
     if gist.id.is_some() {
         return Ok(gist);
@@ -199,6 +201,7 @@ fn resolve_gist(gist: &Gist) -> io::Result<Cow<Gist>> {
     // local gist, or listing all the owner's gists to find the matching ID.
     if gist.is_local() {
         let id = try!(id_from_binary_path(gist.binary_path()));
+        debug!("Gist {} found locally with ID={}", gist.uri, id);
         Ok(Cow::Owned(gist.into_owned().with_id(id)))
     } else {
         if !gist.uri.has_owner() {
@@ -206,7 +209,10 @@ fn resolve_gist(gist: &Gist) -> io::Result<Cow<Gist>> {
                 io::ErrorKind::InvalidData, format!("Invalid GitHub gist: {}", gist.uri)));
         }
         match iter_gists(&gist.uri.owner).find(|g| gist.uri == g.uri) {
-            Some(gist) => Ok(Cow::Owned(gist)),
+            Some(gist) => {
+                debug!("Gist {} found on GitHub with ID={}", gist.uri, gist.id.as_ref().unwrap());
+                Ok(Cow::Owned(gist))
+            },
             _ => Err(io::Error::new(
                 io::ErrorKind::InvalidData, format!("Gist {} not found", gist.uri))),
         }
@@ -269,7 +275,7 @@ fn update_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
     assert!(gist.id.is_some(), "Gist {} has unknown GitHub ID!", gist.uri);
     assert!(path.exists(), "Directory for gist {} doesn't exist!", gist.uri);
 
-    debug!("Updating GitHub gist {}...", gist.uri);
+    trace!("Updating GitHub gist {}...", gist.uri);
     let reflog_msg = Some("gisht-update");
     if let Err(err) = git_pull(&path, "origin", reflog_msg) {
         match err.code() {
@@ -298,6 +304,7 @@ fn update_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
         }
     }
 
+    debug!("GitHub gist {} successfully updated", gist.uri);
     Ok(())
 }
 
