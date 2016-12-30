@@ -118,13 +118,12 @@ impl slog_stream::Format for LogFormat {
                     None => "main".into(),
                 }
             };
-            // Dim the prefix (everything that's not a message)
-            // if we're outputting to a Unix terminal.
+            // Dim the prefix (everything that's not a message) if we're outputting to a TTY.
             let prefix_style = if self.tty { *TTY_FINE_PREFIX_STYLE } else { Style::default() };
             let prefix = format!("{}{} {}#{}]", level, logtime, module, record.line());
             format!("{} {}\n", prefix_style.paint(prefix), record.msg())
         } else {
-            // Colorize the level label if we're outputting to a Unix terminal.
+            // Colorize the level label if we're outputting to a TTY.
             let level: Cow<str> = if self.tty {
                 let style = TTY_LEVEL_STYLES.get(&record.level().as_usize())
                     .cloned()

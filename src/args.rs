@@ -117,7 +117,7 @@ pub struct Options {
     /// Gist to operate on.
     pub gist: GistArg,
     /// Arguments to the gist, if any.
-    /// This is only used if command == Some(Command::Run).
+    /// This is only used if command == Command::Run.
     pub gist_args: Option<Vec<String>>,
 }
 

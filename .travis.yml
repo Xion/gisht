@@ -1,17 +1,34 @@
+#
+# Travis CI configuration file
+#
+
+# Based mostly upon https://github.com/BurntSushi/ripgrep/blob/master/.travis.yml
+
 language: rust
 
-rust:
-  - nightly
-  - beta
-  - stable
+env:
+  global:
+    - PROJECT_NAME=gisht
+    - LINUX_TARGET=x86_64-unknown-linux-gnu
+    - OSX_TARGET=x86_64-apple-darwin
+
 os:
   - linux
   - osx
+rust:
+  - stable
+  - beta
+  - nightly
 
-# Test on nightly Rust, but failures there won't break the build.
 matrix:
+  # Test on nightly Rust, but failures there won't break the build.
   allow_failures:
     - rust: nightly
+
+# Specify the exact Rust build target.
+before_script:
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]];  then TARGET="$LINUX_TARGET" ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then TARGET="$OSX_TARGET"   ; fi
 
 #
 # Dependencies
