@@ -3,18 +3,21 @@
 //! This is specifically about the gist.github.com part of GitHub,
 //! NOT the actual GitHub repository hosting.
 
+mod api;
+mod util;
+
+
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::fs;
-use std::io::{self, Read};
+use std::io;
 use std::iter::Iterator;
 use std::marker::PhantomData;
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use git2::{self, Repository};
-use hyper::client::{Client, Response};
-use hyper::header::{ContentLength, UserAgent};
+use hyper::Client;
+use hyper::header::UserAgent;
 use regex::{self, Regex};
 use rustc_serialize::json::Json;
 use url::Url;
@@ -24,6 +27,7 @@ use ext::hyper::header::Link;
 use gist::{self, Datum, Gist};
 use util::{mark_executable, symlink_file};
 use super::{FetchMode, Host};
+use self::util::read_json;
 
 
 /// GitHub host ID.
@@ -102,9 +106,9 @@ impl Host for GitHub {
         let gist = try!(resolve_gist(gist));
 
         let id = gist.id.as_ref().unwrap();
-        let info = try!(get_gist_info(id));
+        let info = try!(api::get_gist_info(id));
 
-        let result = build_gist_info(&info, &[]);
+        let result = api::build_gist_info(&info, &[]);
         Ok(Some(result))
     }
 
@@ -138,15 +142,15 @@ impl Host for GitHub {
         // Obtain gist information using GitHub API.
         // Note that gist owner may be in the URL already, or we may need to get it
         // from gist info along with gist name.
-        let info = try_some!(get_gist_info(id));
-        let name = match gist_name_from_info(&info) {
+        let info = try_some!(api::get_gist_info(id));
+        let name = match api::gist_name_from_info(&info) {
             Some(name) => name,
             None => {
                 warn!("GitHub gist with ID={} (URL={}) has no files", id, orig_url);
                 return None;
             },
         };
-        let owner = captures.name("owner").unwrap_or_else(|| gist_owner_from_info(&info));
+        let owner = captures.name("owner").unwrap_or_else(|| api::gist_owner_from_info(&info));
 
         // Return the resolved gist.
         let uri = gist::Uri::new(ID, owner, name).unwrap();
@@ -166,16 +170,8 @@ lazy_static! {
     ).unwrap();
 }
 
-/// "Owner" of anonymous gists.
-/// GitHub makes these URLs equivalent and pointing to the same gist:
-/// https://gist.github.com/anonymous/42 and https://gist.github.com/42
-const ANONYMOUS: &'static str = "anonymous";
-
 
 // Fetching gists
-
-/// Base URL for GitHub API requests.
-const API_URL: &'static str = "https://api.github.com";
 
 /// Size of the GitHub response page in items (e.g. gists).
 const RESPONSE_PAGE_SIZE: usize = 50;
@@ -373,7 +369,7 @@ fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
         Some(url) => url,
         None => {
             trace!("Need to get clone URL from GitHub for gist {}", gist.uri);
-            let info = try!(get_gist_info(&gist.id.as_ref().unwrap()));
+            let info = try!(api::get_gist_info(&gist.id.as_ref().unwrap()));
             let url = match info.find("git_pull_url").and_then(|u| u.as_string()) {
                 Some(url) => url.to_owned(),
                 None => {
@@ -431,7 +427,7 @@ struct GistsIterator<'o> {
 impl<'o> GistsIterator<'o> {
     pub fn new(owner: &'o str) -> Self {
         let gists_url = {
-            let mut url = Url::parse(API_URL).unwrap();
+            let mut url = Url::parse(api::API_URL).unwrap();
             url.set_path(&format!("users/{}/gists", owner));
             url.query_pairs_mut()
                 .append_pair("per_page", &RESPONSE_PAGE_SIZE.to_string());
@@ -523,7 +519,7 @@ impl<'o> GistsIterator<'o> {
     /// Convert a JSON representation of the gist into a Gist object.
     fn gist_from_json(&self, gist: &Json) -> Option<Gist> {
         let id = gist["id"].as_string().unwrap();
-        let name = match gist_name_from_info(&gist) {
+        let name = match api::gist_name_from_info(&gist) {
             Some(name) => name,
             None => {
                 warn!("GitHub gist #{} (owner={}) has no files", id, self.owner);
@@ -535,92 +531,10 @@ impl<'o> GistsIterator<'o> {
 
         // Include the gist Info with fields that are commonly used by gist commands.
         // TODO: determine the complete set of fields that can be fetched here
-        let info = build_gist_info(&gist, &[Datum::RawUrl, Datum::BrowserUrl]);
+        let info = api::build_gist_info(&gist, &[Datum::RawUrl, Datum::BrowserUrl]);
         let result = Gist::new(uri, id).with_info(info);
         Some(result)
     }
-}
-
-
-// Handling gist info JSON
-
-/// Retrieve information/metadata about a gist.
-/// Returns a Json object with the parsed GitHub response.
-fn get_gist_info(gist_id: &str) -> io::Result<Json> {
-    let http = Client::new();
-
-    let gist_url = {
-        let mut url = Url::parse(API_URL).unwrap();
-        url.set_path(&format!("gists/{}", gist_id));
-        url.into_string()
-    };
-
-    debug!("Getting GitHub gist info from {}", gist_url);
-    let mut resp = try!(http.get(&gist_url)
-        .header(UserAgent(USER_AGENT.clone()))
-        .send()
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
-    Ok(read_json(&mut resp))
-}
-
-/// Build the complete gist Info from its GitHub JSON representation.
-/// If fields are non-empty, only selected fields are included in the info.
-fn build_gist_info(info: &Json, data: &[Datum]) -> gist::Info {
-    let mut data: Vec<_> = data.to_vec();
-    if data.is_empty() {
-        data = Datum::iter_variants().collect();
-    }
-
-    lazy_static! {
-        // Mapping of gist::Info items to keys in the JSON.
-        static ref INFO_FIELDS: HashMap<Datum, &'static str> = hashmap!{
-            Datum::Id => "id",
-            Datum::Description => "description",
-            Datum::BrowserUrl => "html_url",
-            Datum::RawUrl => "git_pull_url",
-            Datum::CreatedAt => "created_at",
-            Datum::UpdatedAt => "updated_at",
-        };
-    }
-    let mut result = gist::InfoBuilder::new();
-    for datum in data {
-        if let Some(field) = INFO_FIELDS.get(&datum) {
-            match info.find(field).and_then(|f| f.as_string()) {
-                Some(value) => { result.set(datum, value); },
-                None => { warn!("Missing info key '{}' in gist JSON", field); },
-            }
-        } else {
-            // Special-cased data that are more complicated to get.
-            match datum {
-                Datum::Owner => { result.set(datum, gist_owner_from_info(&info)); },
-                _ => { panic!("Unexpected gist info data piece: {:?}", datum); },
-            }
-        }
-    }
-    result.build()
-}
-
-/// Retrieve gist name from the parsed JSON of gist info.
-///
-/// The gist name is defined to be the name of its first file,
-/// as this is how GitHub page itself picks it.
-fn gist_name_from_info(info: &Json) -> Option<&str> {
-    let files = try_opt!(info.find("files").and_then(|fs| fs.as_object()));
-    let mut filenames: Vec<_> = files.keys().map(|s| s as &str).collect();
-    if filenames.is_empty() {
-        None
-    } else {
-        filenames.sort();
-        Some(filenames[0])
-    }
-}
-
-/// Retrieve gist owner from the parsed JSON of gist info.
-/// This may be an anonymous name.
-fn gist_owner_from_info(info: &Json) -> &str {
-    info.find_path(&["owner", "login"])
-        .and_then(|l| l.as_string())
-        .unwrap_or(ANONYMOUS)
 }
 
 
@@ -633,16 +547,6 @@ fn ensure_github_gist(gist: &Gist) -> io::Result<()> {
             "expected a GitHub Gist, but got a '{}' one", gist.uri.host_id)));
     }
     Ok(())
-}
-
-/// Read HTTP response from hyper and parse it as JSON.
-fn read_json(response: &mut Response) -> Json {
-    let mut body = match response.headers.get::<ContentLength>() {
-        Some(&ContentLength(l)) => String::with_capacity(l as usize),
-        _ => String::new(),
-    };
-    response.read_to_string(&mut body).unwrap();
-    Json::from_str(&body).unwrap()
 }
 
 
