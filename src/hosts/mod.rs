@@ -67,7 +67,7 @@ pub trait Host : Send + Sync {
 }
 
 custom_derive! {
-    #[derive(Clone, Debug, PartialEq, Eq,
+    #[derive(Clone, Debug, PartialEq, Eq, Hash,
              IterVariants(FetchModes))]
     pub enum FetchMode {
         /// Automatically decide how & whether to fetch the gist.

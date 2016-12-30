@@ -244,7 +244,7 @@ custom_derive! {
 
 custom_derive! {
     /// Enum describing gist "locality" options.
-    #[derive(Clone, Debug, Eq, PartialEq,
+    #[derive(Clone, Debug, Eq, PartialEq, Hash,
              IterVariants(Localities))]
     pub enum Locality {
         /// Operate only on gists available locally
@@ -258,7 +258,7 @@ custom_derive! {
 
 custom_derive! {
     /// Gist command issued to the application, along with its arguments.
-    #[derive(Clone, Debug, Eq, PartialEq,
+    #[derive(Clone, Debug, Eq, PartialEq, Hash,
              IterVariants(Commands))]
     pub enum Command {
         /// Run the specified gist.
