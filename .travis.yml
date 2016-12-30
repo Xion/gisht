@@ -58,5 +58,5 @@ before_install: |
 #
 
 install:
-  - pip install -r requirements-dev.txt
+  - pip install --user -r requirements-dev.txt
 script: inv test
