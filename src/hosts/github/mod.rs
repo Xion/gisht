@@ -16,18 +16,12 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use git2::{self, Repository};
-use hyper::Client;
-use hyper::header::UserAgent;
 use regex::{self, Regex};
-use rustc_serialize::json::Json;
 use url::Url;
 
-use ::USER_AGENT;
-use ext::hyper::header::Link;
 use gist::{self, Datum, Gist};
 use util::{mark_executable, symlink_file};
 use super::{FetchMode, Host};
-use self::util::read_json;
 
 
 /// GitHub host ID.
@@ -173,9 +167,6 @@ lazy_static! {
 
 // Fetching gists
 
-/// Size of the GitHub response page in items (e.g. gists).
-const RESPONSE_PAGE_SIZE: usize = 50;
-
 lazy_static! {
     /// Minimum interval between updating (git-pulling) of gists.
     static ref UPDATE_INTERVAL: Duration = Duration::from_secs(7 * 24 * 60 * 60);
@@ -204,7 +195,7 @@ fn resolve_gist(gist: &Gist) -> io::Result<Cow<Gist>> {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData, format!("Invalid GitHub gist: {}", gist.uri)));
         }
-        match iter_gists(&gist.uri.owner).find(|g| gist.uri == g.uri) {
+        match api::iter_gists(&gist.uri.owner).find(|g| gist.uri == g.uri) {
             Some(gist) => {
                 debug!("Gist {} found on GitHub with ID={}", gist.uri, gist.id.as_ref().unwrap());
                 Ok(Cow::Owned(gist))
@@ -404,137 +395,6 @@ fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
     }
 
     Ok(())
-}
-
-
-/// Iterate over GitHub gists belonging to given owner.
-#[inline]
-fn iter_gists(owner: &str) -> GistsIterator {
-    GistsIterator::new(owner)
-}
-
-/// Iterator over gists belonging to a particular owner.
-#[derive(Debug)]
-struct GistsIterator<'o> {
-    owner: &'o str,
-    // Iteration state.
-    gists_url: Option<String>,
-    gists_json_array: Option<Vec<Json>>,
-    index: usize,  // within the above array
-    // Other.
-    http: Client,
-}
-impl<'o> GistsIterator<'o> {
-    pub fn new(owner: &'o str) -> Self {
-        let gists_url = {
-            let mut url = Url::parse(api::API_URL).unwrap();
-            url.set_path(&format!("users/{}/gists", owner));
-            url.query_pairs_mut()
-                .append_pair("per_page", &RESPONSE_PAGE_SIZE.to_string());
-            url.into_string()
-        };
-
-        debug!("Iterating over GitHub gists for user {}", owner);
-        GistsIterator{
-            owner: owner,
-            gists_url: Some(gists_url),
-            gists_json_array: None,
-            index: 0,
-            http: Client::new(),
-        }
-    }
-}
-impl<'o> Iterator for GistsIterator<'o> {
-    type Item = Gist;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // First, try to get the next gist from the cached JSON response, if any.
-        if let Some(gist) = self.next_cached() {
-            return Some(gist);
-        }
-
-        // If we don't have any cached gists in JSON form,
-        // talk to the GitHub API to obtain the next (or first) page.
-        if self.gists_json_array.is_none() && self.gists_url.is_some() {
-            self.try_fetch_gists();
-        }
-
-        // Try once more. If we don't get a gist time, it means we're done.
-        self.next_cached()
-    }
-}
-impl<'o> GistsIterator<'o> {
-    /// Retrieve the next Gist from a JSON response that's been received previously.
-    fn next_cached(&mut self) -> Option<Gist> {
-        {
-            let gists = try_opt!(self.gists_json_array.as_ref());
-            let mut index = self.index;
-            while index < gists.len() {
-                if let Some(gist) = self.gist_from_json(&gists[index]) {
-                    self.index = index + 1;
-                    return Some(gist);
-                }
-                index += 1;
-            }
-        }
-        self.gists_json_array = None;
-        self.index = 0;
-        None
-    }
-
-    /// Try to fetch the next page of gists from GitHub API.
-    fn try_fetch_gists(&mut self) {
-        assert!(self.gists_json_array.is_none());
-        assert_eq!(0, self.index);
-
-        let gists_url = self.gists_url.clone().unwrap();
-        trace!("Listing GitHub gists from {}", gists_url);
-
-        let mut resp = self.http.get(&*gists_url)
-            .header(UserAgent(USER_AGENT.clone()))
-            .send().unwrap();
-
-        // Parse the response as JSON array and extract gist names from it.
-        let gists_json = read_json(&mut resp);
-        if let Json::Array(gists) = gists_json {
-            let page_size = gists.len();
-            self.gists_json_array = Some(gists);
-            trace!("Result page with {} gist(s) found", page_size);
-        } else {
-            warn!("Invalid JSON format of GitHub gist result page ({})", gists_url);
-        }
-
-        // Determine the URL to get the next page of gists from.
-        if let Some(&Link(ref links)) = resp.headers.get::<Link>() {
-            if let Some(next) = links.get("next") {
-                self.gists_url = Some(next.url.clone());
-                return;
-            }
-        }
-
-        debug!("Got to the end of gists for GitHub user {}", self.owner);
-        self.gists_url = None;
-    }
-
-    /// Convert a JSON representation of the gist into a Gist object.
-    fn gist_from_json(&self, gist: &Json) -> Option<Gist> {
-        let id = gist["id"].as_string().unwrap();
-        let name = match api::gist_name_from_info(&gist) {
-            Some(name) => name,
-            None => {
-                warn!("GitHub gist #{} (owner={}) has no files", id, self.owner);
-                return None;
-            },
-        };
-        let uri = gist::Uri::new(ID, self.owner, name).unwrap();
-        trace!("GitHub gist found ({}) with id={}", uri, id);
-
-        // Include the gist Info with fields that are commonly used by gist commands.
-        // TODO: determine the complete set of fields that can be fetched here
-        let info = api::build_gist_info(&gist, &[Datum::RawUrl, Datum::BrowserUrl]);
-        let result = Gist::new(uri, id).with_info(info);
-        Some(result)
-    }
 }
 
 
