@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::io;
 
-use hyper::Client;
+use hyper::client::{Client, Response};
 use hyper::header::UserAgent;
 use rustc_serialize::json::Json;
 use url::Url;
@@ -27,19 +27,11 @@ const ANONYMOUS: &'static str = "anonymous";
 /// Retrieve information/metadata about a gist.
 /// Returns a Json object with the parsed GitHub response.
 pub fn get_gist_info(gist_id: &str) -> io::Result<Json> {
-    let http = Client::new();
-
-    let gist_url = {
-        let mut url = Url::parse(API_URL).unwrap();
-        url.set_path(&format!("gists/{}", gist_id));
-        url.into_string()
-    };
+    let mut gist_url = Url::parse(API_URL).unwrap();
+    gist_url.set_path(&format!("gists/{}", gist_id));
 
     debug!("Getting GitHub gist info from {}", gist_url);
-    let mut resp = try!(http.get(&gist_url)
-        .header(UserAgent(USER_AGENT.clone()))
-        .send()
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
+    let mut resp = try!(simple_get(gist_url));
     Ok(read_json(&mut resp))
 }
 
@@ -104,4 +96,17 @@ pub fn gist_owner_from_info(info: &Json) -> &str {
     info.find_path(&["owner", "login"])
         .and_then(|l| l.as_string())
         .unwrap_or(ANONYMOUS)
+}
+
+
+// Utility functions
+
+/// Make a simple GET request to GitHub API.
+fn simple_get(url: Url) -> io::Result<Response> {
+    let url = url.into_string();
+    let http = Client::new();
+    http.get(&url)
+        .header(UserAgent(USER_AGENT.clone()))
+        .send()
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
 }
