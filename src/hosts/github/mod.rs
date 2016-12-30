@@ -4,6 +4,7 @@
 //! NOT the actual GitHub repository hosting.
 
 mod api;
+mod git;
 mod util;
 
 
@@ -15,7 +16,7 @@ use std::marker::PhantomData;
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
-use git2::{self, Repository};
+use git2;
 use regex::{self, Regex};
 use url::Url;
 
@@ -264,11 +265,11 @@ fn update_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
 
     trace!("Updating GitHub gist {}...", gist.uri);
     let reflog_msg = Some("gisht-update");
-    if let Err(err) = git_pull(&path, "origin", reflog_msg) {
+    if let Err(err) = git::pull(&path, "origin", reflog_msg) {
         match err.code() {
             git2::ErrorCode::Conflict => {
                 warn!("Conflict occurred when updating gist {}, rolling back...", gist.uri);
-                try!(git_reset_merge(&path).map_err(git_to_io_error));
+                try!(git::reset_merge(&path));
                 debug!("Conflicting update of gist {} successfully aborted", gist.uri);
             },
             git2::ErrorCode::Uncommitted => {
@@ -277,71 +278,22 @@ fn update_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
                 // There isn't much we can do in such a case,
                 // as it would lead to loss of user's modifications.
                 error!("Uncommitted changes found to local copy of gist {}", gist.uri);
-                return Err(git_to_io_error(err));
+                return Err(git::to_io_error(err));
             },
             git2::ErrorCode::Unmerged => {
                 // This may happen if previous versions of the application
                 // (which didn't handle merge conflicts) has left a mess.
                 warn!("Previous unfinished Git merge prevented update of gist {}", gist.uri);
                 debug!("Attempting to rollback old Git merge of gist {}...", gist.uri);
-                try!(git_reset_merge(&path).map_err(git_to_io_error));
+                try!(git::reset_merge(&path));
                 info!("Old Git merge of gist {} successfully aborted", gist.uri);
             },
-            _ => return Err(git_to_io_error(err)),
+            _ => return Err(git::to_io_error(err)),
         }
     }
 
     debug!("GitHub gist {} successfully updated", gist.uri);
     Ok(())
-}
-
-/// Perform a standard Git "pull" operation.
-fn git_pull<P: AsRef<Path>>(repo_path: P,
-                            remote: &str,
-                            reflog_msg: Option<&str>) -> Result<(), git2::Error> {
-    let repo_path = repo_path.as_ref();
-    trace!("Doing `git pull` from remote `{}` inside {}", remote, repo_path.display());
-
-    // Since libgit2 is low-level, we have to perform the requisite steps manually,
-    // which means:
-    // * doing the fetch from origin remote
-    // * checking out the (new) HEAD
-    let repo = try!(Repository::open(repo_path));
-    let mut origin = try!(repo.find_remote(remote));
-    try!(origin.fetch(/* refspecs */ &[], /* options */ None, reflog_msg));
-    try!(repo.checkout_head(/* options */ None));
-
-    Ok(())
-}
-
-/// Reset an ongoing Git merge operation.
-///
-/// This isn't exactly the same as `git reset --merge`, because local changes to working tree
-/// (prior from starting the merge) are not preserved.
-/// Since gists are not supposed to be modified locally, this is fine, however.
-fn git_reset_merge<P: AsRef<Path>>(repo_path: P) -> Result<(), git2::Error> {
-    let repo_path = repo_path.as_ref();
-    trace!("Resetting the merge inside {}", repo_path.display());
-
-    let repo = try!(Repository::open(repo_path));
-    assert_eq!(git2::RepositoryState::Merge, repo.state(),
-        "Tried to reset a merge on a Git repository that isn't in merge state");
-
-    // Reset (--hard) back to HEAD, and then cleanup the repository state
-    // so that MERGE_HEAD doesn't exist anymore, effectively aborting the merge.
-    let head_revspec = try!(repo.revparse("HEAD"));
-    let head = head_revspec.to().unwrap();
-    let mut checkout = git2::build::CheckoutBuilder::new();
-    checkout.force();
-    try!(repo.reset(&head, git2::ResetType::Hard, Some(&mut checkout)));
-    try!(repo.cleanup_state());
-
-    Ok(())
-}
-
-/// Convert a git2 library error to a generic Rust I/P error.
-fn git_to_io_error(git_err: git2::Error) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, git_err)
 }
 
 
@@ -379,7 +331,7 @@ fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
     debug!("Cloning GitHub gist from {}", clone_url);
     let path = gist.path();
     try!(fs::create_dir_all(&path));
-    try!(Repository::clone(&clone_url, &path).map_err(git_to_io_error));
+    try!(git::clone(&clone_url, &path));
 
     // Make sure the gist's executable is, in fact, executable.
     let executable = gist.path().join(&gist.uri.name);
