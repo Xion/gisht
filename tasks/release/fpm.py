@@ -18,6 +18,8 @@ from invoke import task
 from invoke.exceptions import Exit
 import toml
 
+from tasks.release import RELEASE_DIR
+
 
 # Package information.
 #
@@ -35,7 +37,7 @@ PACKAGE_INFO = dict(
 SOURCE_DIR = Path.cwd() / 'target' / 'release'
 BIN = 'gisht'
 EXTRA_FILES = ['LICENSE', 'README.md']
-OUTPUT_DIR = Path.cwd() / 'release'
+OUTPUT_DIR = RELEASE_DIR
 
 # Directory where the binary should be installed on Linux systems.
 LINUX_INSTALL_DIR = '/usr/bin'
