@@ -25,16 +25,6 @@ matrix:
   allow_failures:
     - rust: nightly
 
-# Specify the exact Rust build target.
-before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]];  then TARGET="$LINUX_TARGET" ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then TARGET="$OSX_TARGET"   ; fi
-
-# OSX requires additional stuff to be installed via Homebrew.
-before_install: |
-  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-    brew update
-  fi
 
 #
 # Dependencies
@@ -48,9 +38,17 @@ addons:
     packages:
       - cmake
 
-# OSX
-# (openssl incantations taken from https://github.com/sfackler/rust-openssl/issues/255)
-before_install: |
+before_install:
+  # Specify the exact Rust build target.
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]];  then TARGET="$LINUX_TARGET" ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then TARGET="$OSX_TARGET"   ; fi
+
+  # OSX requires additional stuff to be installed via Homebrew.
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then brew update            ; fi
+
+  # OSX
+  # (openssl incantations taken from https://github.com/sfackler/rust-openssl/issues/255)
+  - |
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     brew install openssl
     export OPENSSL_INCLUDE_DIR=`brew --prefix openssl`/include
@@ -58,18 +56,23 @@ before_install: |
     export DEP_OPENSSL_INCLUDE=`brew --prefix openssl`/include
   fi
 
-#
-# Test script
-#
-
-# For OSX, manually install Python
-# and prepare virtualenv for Invoke tasks' dependencies.
-before_install: |
+  # Also on OSX, manually install Python
+  # and prepare virtualenv for Invoke tasks' dependencies.
+  - |
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     brew install python
     virtualenv venv
     source venv/bin/activate
   fi
-install:
-  - pip install --user -r requirements-dev.txt
+
+#
+# Test script
+#
+
+install: |
+  if [[ "TRAVIS_OS_NAME" == "osx" ]]; then
+    pip install -r requirements-dev.txt
+  else
+    pip install --user -r requirements-dev.txt
+  fi
 script: inv test
