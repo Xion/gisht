@@ -1,8 +1,10 @@
 """
 Utility functions used by automation tasks.
 """
+from itertools import chain
 import logging
 import os
+from pathlib import Path
 try:
     from shlex import quote
 except ImportError:
@@ -10,9 +12,12 @@ except ImportError:
 
 from invoke.exceptions import Exit
 import semver
+import toml
 
 
-__all__ = ['ensure_rustc_version', 'get_cargo_flags', 'cargo']
+__all__ = ['ensure_rustc_version',
+           'get_cargo_flags', 'cargo',
+           'read_cargo_toml']
 
 
 MIN_RUSTC_VERSION = '1.12.0'
@@ -87,3 +92,35 @@ def cargo(ctx, cmd, *args, **kwargs):
         argv = ['cargo'] + cargo_args  # execvpe() needs explicit argv[0]
         env.update(os.environ)
         os.execvpe(argv[0], argv, env)
+
+
+def read_cargo_toml(key, manifest=None):
+    """Read a value from Cargo.toml manifest.
+
+    :param key: Key to read from [package], or entire path to a key.
+                It may contain dots.
+    :param manifest: Optional path to the manifest,
+                     or a file-like object with it opened
+
+    :return: The value
+    """
+    if not isinstance(key, (list, tuple)):
+        key = (key,) if key.startswith('package.') else ('package', key)
+    key = list(chain.from_iterable(k.split('.') for k in key))
+    if not key:
+        raise ValueError("key must not be empty")
+
+    # Read the content of Cargo.toml.
+    manifest = manifest or Path.cwd() / 'Cargo.toml'
+    if hasattr(manifest, 'read'):
+        content = toml.load(manifest)
+    else:
+        manifest = Path(manifest)
+        with manifest.open() as f:
+            content = toml.load(f)
+
+    # Get the value.
+    value = content
+    for k in key:
+        value = value[k]
+    return value

@@ -7,12 +7,11 @@ import sys
 
 from invoke import Collection, task
 
-from tasks.util import ensure_rustc_version, get_cargo_flags, cargo
+from tasks.util import (
+    ensure_rustc_version, get_cargo_flags, cargo, read_cargo_toml)
 
 
-# TODO: tasks.release.fpm is reading this from Cargo.toml,
-# so we could be doing that here, too
-BIN = 'gisht'
+BIN = read_cargo_toml('package.name')
 
 HELP = {
     'release': "Whether to run Cargo in release mode.",

@@ -7,6 +7,7 @@ Refer to fpm's README for installation instructions.
 """
 from itertools import starmap
 import logging
+import os
 from pathlib import Path
 import shutil
 try:
@@ -159,6 +160,12 @@ def bundle(ctx, target, **flags):
     if 'iteration' not in flags:
         sha = ctx.run('git rev-parse --short HEAD', hide=True).stdout.strip()
         flags['iteration'] = sha
+
+    # Include architecture spec if know.
+    # (This env variable should be provided by a CI script).
+    arch = os.environ.get('ARCH')
+    if arch:
+        flags['architecture'] = arch
 
     def format_flag(name, value):
         return '-%s %s' % (name if len(name) == 1 else '-' + name,
