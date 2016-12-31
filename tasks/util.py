@@ -27,7 +27,7 @@ def ensure_rustc_version(ctx):
         raise Exit(rustc_v.return_code)
 
     try:
-        _, version, _ = rustc_v.stdout.split(None, 2)
+        _, version = rustc_v.stdout.split(None)[:2]
     except ValueError:
         logging.error("Unexpected output from `%s`: %s", cmd, rustc_v.stdout)
         raise Exit(2)
