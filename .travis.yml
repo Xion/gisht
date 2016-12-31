@@ -38,13 +38,9 @@ addons:
     packages:
       - cmake
 
+# OSX
+# (openssl incantations taken from https://github.com/sfackler/rust-openssl/issues/255)
 before_install: |
-  # Specify the exact Rust build target.
-  if [[ "$TRAVIS_OS_NAME" == "linux" ]];  then TARGET="$LINUX_TARGET" ; fi
-  if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then TARGET="$OSX_TARGET"   ; fi
-
-  # OSX
-  # (openssl incantations taken from https://github.com/sfackler/rust-openssl/issues/255)
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     brew update
     brew install openssl
@@ -71,5 +67,13 @@ install: |
   else
     pip install --user -r requirements-dev.txt
   fi
+
+before_script:
+  # Specify the exact Rust build target.
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]];  then TARGET="$LINUX_TARGET" ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then TARGET="$OSX_TARGET"   ; fi
+
+  # Activate the Python virtualenv for OSX again.
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then source venv/bin/activate ; fi
 
 script: inv test
