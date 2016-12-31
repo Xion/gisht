@@ -2,7 +2,8 @@
 # Python packages used in development
 #
 
-invoke>=0.13
+# TODO: change this back to `invoke>=0.13` if/when util.bytes_to_read fix gets merged
+git+https://github.com/Xion/invoke.git#egg=invoke
 
 # Dependencies used directly by automation tasks
 pathlib
