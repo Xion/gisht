@@ -26,9 +26,15 @@ matrix:
     - rust: nightly
 
 # Specify the exact Rust build target.
-before_script:
+before_install:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]];  then TARGET="$LINUX_TARGET" ; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then TARGET="$OSX_TARGET"   ; fi
+
+# OSX requires additional stuff to be installed via Homebrew.
+before_install: |
+  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+    brew update
+  fi
 
 #
 # Dependencies
@@ -46,7 +52,6 @@ addons:
 # (openssl incantations taken from https://github.com/sfackler/rust-openssl/issues/255)
 before_install: |
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-    brew update
     brew install openssl
     export OPENSSL_INCLUDE_DIR=`brew --prefix openssl`/include
     export OPENSSL_LIB_DIR=`brew --prefix openssl`/lib
@@ -57,6 +62,14 @@ before_install: |
 # Test script
 #
 
+# For OSX, manually install Python
+# and prepare virtualenv for Invoke tasks' dependencies.
+before_install: |
+  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+    brew install python
+    virtualenv venv
+    source venv/bin/activate
+  fi
 install:
   - pip install --user -r requirements-dev.txt
 script: inv test
