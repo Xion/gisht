@@ -41,13 +41,6 @@ OUTPUT_DIR = Path.cwd() / 'release'
 LINUX_INSTALL_DIR = '/usr/bin'
 
 
-@task(default=True)
-def all(ctx):
-    """Create all release packages."""
-    deb(ctx)
-    rpm(ctx)
-
-
 @task
 def deb(ctx):
     """Create the release package for Debian (.deb)."""
