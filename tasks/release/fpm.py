@@ -36,8 +36,11 @@ PACKAGE_INFO = dict(
 )
 
 SOURCE_DIR = Path.cwd() / 'target' / 'release'
-EXTRA_FILES = ['LICENSE', 'README.md']
 OUTPUT_DIR = RELEASE_DIR
+
+# Extra files to include in the release bundle.
+# (Paths are relative to project root).
+EXTRA_FILES = ['LICENSE', 'README.md', 'target/release/complete/*']
 
 # Directory where the binary should be installed on Linux systems.
 LINUX_INSTALL_DIR = '/usr/bin'
@@ -99,10 +102,16 @@ def prepare_release(ctx):
         logging.warning("'strip' not found, binary will retain debug symbols.")
 
     # Extra files we want to include.
-    for filename in EXTRA_FILES:
-        path = Path.cwd() / filename
-        logging.debug("Copying %s file to release directory...", filename)
-        shutil.copy(str(path), str(SOURCE_DIR))
+    cwd = Path.cwd()
+    for pattern in EXTRA_FILES:
+        for path in cwd.glob(pattern):
+            logging.debug("Copying %s file to release directory...",
+                          path.relative_to(cwd))
+            try:
+                shutil.copy(str(path), str(SOURCE_DIR))
+            except shutil.Error as e:
+                if 'same file' not in str(e):
+                    raise
 
 
 def ensure_output_dir():
@@ -126,7 +135,7 @@ def ensure_output_dir():
 
 
 def bundle(ctx, target, **flags):
-    """Create a release bundle by involing `fpm` with common parameters.
+    """Create a release bundle by involving `fpm` with common parameters.
 
     :param target: Release target, like "deb", "rpm", etc.
     :param flags: Additional flags to be passed to fpm
@@ -156,7 +165,15 @@ def bundle(ctx, target, **flags):
                            quote(value))
     fpm_flags = ' '.join(starmap(format_flag, flags.items()))
 
-    source_files = [BIN] + EXTRA_FILES
+    # Determine the exact files that comprise the bundle.
+    source_files = [BIN]
+    for pattern in EXTRA_FILES:
+        for path in Path.cwd().glob(pattern):
+            try:
+                filename = path.relative_to(SOURCE_DIR)
+            except ValueError:
+                filename = path.relative_to(Path.cwd())
+            source_files.append(str(filename))
     fpm_args = ' '.join(map(quote, source_files))
 
     fpm_cmdline = 'fpm --force --log error %s %s' % (fpm_flags, fpm_args)
