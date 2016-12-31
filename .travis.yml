@@ -61,7 +61,7 @@ install: |
   if [[ "TRAVIS_OS_NAME" == "osx" ]]; then
     brew update
     brew install python
-    virtualenv venv
+    virtualenv $TRAVIS_BUILD_DIR/.venv
     source $TRAVIS_BUILD_DIR/.venv/bin/activate
     pip install -r requirements-dev.txt
   else
