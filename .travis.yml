@@ -43,7 +43,7 @@ addons:
 # OSX
 before_install: |
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-    brew update
+    brew update >/dev/null
 
     # (openssl incantations taken from https://github.com/sfackler/rust-openssl/issues/255)
     brew install openssl
@@ -53,6 +53,8 @@ before_install: |
 
     # Install latest stable Rust via rustup.
     brew install rust
+    rustc --version
+    cargo --version
 
     # Also on OSX, manually install Python
     # and prepare virtualenv for Invoke tasks' dependencies.

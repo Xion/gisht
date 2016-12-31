@@ -20,12 +20,18 @@ MIN_RUSTC_VERSION = '1.12.0'
 
 def ensure_rustc_version(ctx):
     """Terminates the build unless the Rust compiler is recent enough."""
-    rustc_v = ctx.run('rustc --version', hide=True, warn=True)
+    cmd = 'rustc --version'
+    rustc_v = ctx.run(cmd, hide=True, warn=True)
     if not rustc_v.ok:
         logging.critical("Rust compiler not found, aborting build.")
         raise Exit(rustc_v.return_code)
 
-    _, version, _ = rustc_v.stdout.split(None, 2)
+    try:
+        _, version, _ = rustc_v.stdout.split(None, 2)
+    except ValueError:
+        logging.error("Unexpected output from `%s`: %s", cmd, rustc_v.stdout)
+        raise Exit(2)
+
     if not semver.match(version, '>=' + MIN_RUSTC_VERSION):
         logging.error("Build requires at least Rust %s, found %s",
                       MIN_RUSTC_VERSION, version)
