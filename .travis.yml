@@ -9,8 +9,8 @@ language: rust
 env:
   global:
     - PROJECT_NAME=gisht
-    - LINUX_TARGET=x86_64-unknown-linux-gnu
-    - OSX_TARGET=x86_64-apple-darwin
+    - LINUX_ARCH=x86_64-unknown-linux-gnu
+    - OSX_ARCH=x86_64-apple-darwin
 
 os:
   - linux
@@ -59,7 +59,7 @@ install: |
 
 before_script:
   # Specify the exact Rust build target.
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]];  then export TARGET="$LINUX_TARGET" ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then export TARGET="$OSX_TARGET"   ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]];  then export ARCH="$LINUX_ARCH" ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then export ARCH="$OSX_ARCH"   ; fi
 
 script: inv test

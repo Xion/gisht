@@ -34,11 +34,23 @@ PACKAGE_INFO = dict(
 
 SOURCE_DIR = Path.cwd() / 'target' / 'release'
 BIN = 'gisht'
-LICENSE_FILE = Path.cwd() / 'LICENSE'
+EXTRA_FILES = ['LICENSE', 'README.md']
 OUTPUT_DIR = Path.cwd() / 'release'
 
 # Directory where the binary should be installed on Linux systems.
 LINUX_INSTALL_DIR = '/usr/bin'
+
+
+@task
+def tar(ctx):
+    """Create a release tarball."""
+    ensure_fpm(ctx)
+    ensure_output_dir()
+    prepare_release(ctx)
+
+    logging.info("Preparing release tarball...")
+    bundle(ctx, 'tar')
+    logging.debug("Release tarball created.")
 
 
 @task
@@ -84,15 +96,18 @@ def prepare_release(ctx):
     else:
         logging.warning("'strip' not found, binary will retain debug symbols.")
 
-    # Ensure a license file is available in the source directory.
-    shutil.copy(str(LICENSE_FILE), str(SOURCE_DIR))
+    # Extra files we want to include.
+    for filename in EXTRA_FILES:
+        path = Path.cwd() / filename
+        logging.debug("Copying %s file to release directory...", filename)
+        shutil.copy(str(path), str(SOURCE_DIR))
 
 
 def ensure_output_dir():
     """Ensure that the release directory exists."""
     if OUTPUT_DIR.exists():
-        return
-    if not OUTPUT_DIR.is_dir():
+        if OUTPUT_DIR.is_dir():
+            return
         logging.error("Output path %s already exists but it's not a directory!",
                       OUTPUT_DIR)
         raise Exit(2)
@@ -137,9 +152,12 @@ def bundle(ctx, target, **flags):
     def format_flag(name, value):
         return '-%s %s' % (name if len(name) == 1 else '-' + name,
                            quote(value))
-    fpm_args = ' '.join(starmap(format_flag, flags.items()))
-    fpm_cmdline = 'fpm --force --log error %s %s' % (fpm_args, BIN)
+    fpm_flags = ' '.join(starmap(format_flag, flags.items()))
 
+    source_files = [BIN] + EXTRA_FILES
+    fpm_args = ' '.join(map(quote, source_files))
+
+    fpm_cmdline = 'fpm --force --log error %s %s' % (fpm_flags, fpm_args)
     logging.debug("Running %s" % fpm_cmdline)
     return ctx.run(fpm_cmdline)
 

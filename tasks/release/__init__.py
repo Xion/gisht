@@ -9,6 +9,12 @@ from invoke import Collection, task
 @task(name="all")
 def all_(ctx):
     """Create all release packages."""
+    from tasks.release.fpm import deb, rpm, tar
+
+    # Generic.
+    tar(ctx)
+
+    # Linux.
     deb(ctx)
     rpm(ctx)
 
