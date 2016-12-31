@@ -41,22 +41,22 @@ addons:
       - cmake
 
 # OSX
-# (openssl incantations taken from https://github.com/sfackler/rust-openssl/issues/255)
 before_install: |
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+    # (openssl incantations taken from https://github.com/sfackler/rust-openssl/issues/255)
     brew update
     brew install openssl
     export OPENSSL_INCLUDE_DIR=`brew --prefix openssl`/include
     export OPENSSL_LIB_DIR=`brew --prefix openssl`/lib
     export DEP_OPENSSL_INCLUDE=`brew --prefix openssl`/include
-  fi
 
-#
-# Test script
-#
+    # Install latest stable Rust via rustup.
+    # (Taken from Travis own build logs for os:osx/language:rust)
+    curl -sL https://static.rust-lang.org/rustup.sh -o ~/rust-installer/rustup.sh
+    sh ~/rust-installer/rustup.sh --prefix=~/rust --spec=stable -y --disable-sudo 2> /dev/null
+    rustc --version
+    cargo --version
 
-install: |
-  if [[ "TRAVIS_OS_NAME" == "osx" ]]; then
     # Also on OSX, manually install Python
     # and prepare virtualenv for Invoke tasks' dependencies.
     # (This has to be done in install: section as per this comment:
@@ -65,14 +65,15 @@ install: |
     brew install python
     virtualenv $TRAVIS_BUILD_DIR/.venv
     source $TRAVIS_BUILD_DIR/.venv/bin/activate
-    pip install -r requirements-dev.txt
+  fi
 
-    # Install latest stable Rust via rustup.
-    # (Taken from Travis own build logs for os:osx/language:rust)
-    curl -sL https://static.rust-lang.org/rustup.sh -o ~/rust-installer/rustup.sh
-    sh ~/rust-installer/rustup.sh --prefix=~/rust --spec=stable -y --disable-sudo 2> /dev/null
-    rustc --version
-    cargo --version
+#
+# Test script
+#
+
+install: |
+  if [[ "TRAVIS_OS_NAME" == "osx" ]]; then
+    pip install -r requirements-dev.txt
   else
     pip install --user -r requirements-dev.txt
   fi
@@ -81,8 +82,5 @@ before_script:
   # Specify the exact Rust build target.
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]];  then TARGET="$LINUX_TARGET" ; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then TARGET="$OSX_TARGET"   ; fi
-
-  # Activate the Python virtualenv for OSX again.
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then source $TRAVIS_BUILD_DIR/.venv/bin/activate ; fi
 
 script: inv test
