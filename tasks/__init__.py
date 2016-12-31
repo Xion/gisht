@@ -10,6 +10,10 @@ from invoke import Collection, task
 from tasks.util import ensure_rustc_version, get_cargo_flags, cargo
 
 
+# TODO: tasks.release.fpm is reading this from Cargo.toml,
+# so we could be doing that here, too
+BIN = 'gisht'
+
 HELP = {
     'release': "Whether to run Cargo in release mode.",
     'verbose': "Whether to show verbose logging output of the build",

@@ -8,12 +8,16 @@ from pathlib import Path
 from invoke import task
 from invoke.exceptions import Exit
 
+from tasks import BIN, HELP
 from tasks.util import ensure_rustc_version, cargo, get_cargo_flags
 
 
-HELP = {
-    'release': "Whether to build the binary in release mode.",
-    'verbose': "Whether to show verbose logging output of the build",
+COMPLETE_DIR = 'complete'
+COMPLETE_SHELLS = {
+    'bash': '{bin}.bash-completion',
+    'fish': '{bin}.fish',
+    'powershell': '_{bin}.ps1',
+    'zsh': '_{bin}',
 }
 
 
@@ -22,6 +26,7 @@ def all(ctx, release=False, verbose=False):
     """Build all parts of the project."""
     bin(ctx, release=release, verbose=verbose)
     readme(ctx, release=release, verbose=verbose)
+    completions(ctx, release=release, verbose=verbose)
 
 
 @task(help=HELP)
@@ -40,12 +45,7 @@ def readme(ctx, release=False, verbose=False):
     """
     # Run the resulting binary to obtain command line help.
     verbose and logging.debug("Running the binary to obtain usage string")
-    binary = cargo(ctx, 'run', *get_cargo_flags(release, verbose=False),
-                   hide=True, warn=True, wait=True)
-    if not (binary.ok or binary.return_code == os.EX_USAGE):
-        logging.critical("Compiled binary return error code %s; stderr:\n%s",
-                         binary.return_code, binary.stderr)
-        raise Exit(binary.return_code)
+    binary = run_binary(ctx, release=release, verbose=False)
     help_lines = binary.stderr.strip().splitlines()
 
     # Beautify it a little before pasting into README.
@@ -88,3 +88,47 @@ def readme(ctx, release=False, verbose=False):
         f.seek(0)
         f.truncate()
         f.write(readme_content)
+
+
+@task(pre=[bin], help=HELP)
+def completions(ctx, release=False, verbose=False):
+    """Create the autocomplete scripts for various shells."""
+    build_profile = 'release' if release else 'debug'
+    complete_dir = Path.cwd() / 'target' / build_profile / COMPLETE_DIR
+    if not complete_dir.exists():
+        complete_dir.mkdir(parents=True)
+
+    # Call the binary with a special hidden flag that causes it to produce
+    # autocompletion script via clap.
+    for shell, filename in COMPLETE_SHELLS.items():
+        binary = run_binary(ctx, '--complete', shell,
+                            release=release, verbose=False)
+        filename = filename.format(bin=BIN)
+        with (complete_dir / filename).open('w+b') as f:
+            f.write(binary.stdout)
+
+
+# Utility functions
+
+def run_binary(ctx, *args, **kwargs):
+    """Run the compiled binary.
+
+    Positional arguments are passed to the binary as parameters.
+    Keyword arguments: release, verbose.
+
+    :return: Invoke's process object
+    """
+    release = kwargs.pop('release', False)
+    verbose = kwargs.pop('verbose', False)
+
+    cargo_args = get_cargo_flags(release, verbose)
+    if args:
+        cargo_args.append('--')
+        cargo_args.extend(args)
+
+    binary = cargo(ctx, 'run', *cargo_args, hide=True, warn=True, wait=True)
+    if not (binary.ok or binary.return_code == os.EX_USAGE):
+        logging.critical("Compiled binary returned error code %s; stderr:\n%s",
+                         binary.return_code, binary.stderr)
+        raise Exit(binary.return_code)
+    return binary

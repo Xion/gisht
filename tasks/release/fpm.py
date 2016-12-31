@@ -18,6 +18,7 @@ from invoke import task
 from invoke.exceptions import Exit
 import toml
 
+from tasks import BIN
 from tasks.release import RELEASE_DIR
 
 
@@ -35,7 +36,6 @@ PACKAGE_INFO = dict(
 )
 
 SOURCE_DIR = Path.cwd() / 'target' / 'release'
-BIN = 'gisht'
 EXTRA_FILES = ['LICENSE', 'README.md']
 OUTPUT_DIR = RELEASE_DIR
 
