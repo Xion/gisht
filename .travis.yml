@@ -14,13 +14,15 @@ env:
 
 os:
   - linux
-  - osx
 rust:
   - stable
   - beta
   - nightly
 
 matrix:
+  include:
+    - os: osx
+      language: generic
   # Test on nightly Rust, but failures there won't break the build.
   allow_failures:
     - rust: nightly
@@ -53,17 +55,24 @@ before_install: |
 # Test script
 #
 
-# Also on OSX, manually install Python
-# and prepare virtualenv for Invoke tasks' dependencies.
-# (This has to be done in install: section as per this comment:
-#  https://github.com/travis-ci/travis-ci/issues/2312#issuecomment-247206351)
 install: |
   if [[ "TRAVIS_OS_NAME" == "osx" ]]; then
+    # Also on OSX, manually install Python
+    # and prepare virtualenv for Invoke tasks' dependencies.
+    # (This has to be done in install: section as per this comment:
+    #  https://github.com/travis-ci/travis-ci/issues/2312#issuecomment-247206351)
     brew update
     brew install python
     virtualenv $TRAVIS_BUILD_DIR/.venv
     source $TRAVIS_BUILD_DIR/.venv/bin/activate
     pip install -r requirements-dev.txt
+
+    # Install latest stable Rust via rustup.
+    # (Taken from Travis own build logs for os:osx/language:rust)
+    curl -sL https://static.rust-lang.org/rustup.sh -o ~/rust-installer/rustup.sh
+    sh ~/rust-installer/rustup.sh --prefix=~/rust --spec=stable -y --disable-sudo 2> /dev/null
+    rustc --version
+    cargo --version
   else
     pip install --user -r requirements-dev.txt
   fi
