@@ -57,9 +57,16 @@ install: |
     pip install --user -r requirements-dev.txt
   fi
 
-before_script:
-  # Specify the exact Rust build target.
+script: inv test
+
+
+#
+# Release
+#
+
+before_deploy:
+  # Specify the exact architecture to build the releases for.
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]];  then export ARCH="$LINUX_ARCH" ; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then export ARCH="$OSX_ARCH"   ; fi
 
-script: inv test
+  - . ./ci/travis/before_deploy.sh
