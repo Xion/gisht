@@ -20,7 +20,8 @@ if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
 fi
 
 # Install fpm.
-$_sudo gem install fpm
+# (Pick specific version because 1.8.0+ seems to be borked, at least on OSX)
+$_sudo gem install fpm -v 1.6.3
 
 
 #
