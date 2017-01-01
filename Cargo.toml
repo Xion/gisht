@@ -1,10 +1,13 @@
 [package]
 name = "gisht"
 version = "0.1.0"
-description = "Gists in the shell"
-homepage = "http://github.com/Xion/gisht"
 authors = ["Karol Kuczmarski <karol.kuczmarski@gmail.com>"]
-publish = false
+description = "Gists in the shell"
+documentation = "https://github.com/Xion/gisht"
+homepage = "https://github.com/Xion/gisht"
+repository = "https://github.com/Xion/gisht"
+readme = "README.md"
+keywords = ["gist", "snippet", "GitHub", "pastebin", "shell"]
 license = "GPLv3"
 
 [dependencies]
