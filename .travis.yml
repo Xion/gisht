@@ -23,6 +23,7 @@ matrix:
   include:
     - os: osx
       language: generic
+      rust: stable
   # Test on nightly Rust, but failures there won't break the build.
   allow_failures:
     - rust: nightly
@@ -69,4 +70,17 @@ before_deploy:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]];  then export ARCH="$LINUX_ARCH" ; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then export ARCH="$OSX_ARCH"   ; fi
 
+  # Build the release bundles
   - . ./ci/travis/before_deploy.sh
+
+deploy:
+  provider: releases
+  api_key:
+    secure: TODO
+  file: release/*
+  file_glob: true
+  # Retain the built release artifacts (otherwise there is nothing to deploy).
+  skip_cleanup: true
+  on:
+    tags: true
+    condition: TRAVIS_RUST_VERSION = stable

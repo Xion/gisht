@@ -29,4 +29,8 @@ _sudo gem install fpm
 # Building release packages
 #
 
-# TODO: actually build the release packages
+if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+    inv release.tar_gz
+else
+    inv release
+fi
