@@ -83,7 +83,7 @@ deploy:
   skip_cleanup: true
   on:
     tags: true
-    condition: TRAVIS_RUST_VERSION = stable
+    condition: $TRAVIS_RUST_VERSION = stable
 
 
 #
