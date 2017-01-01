@@ -40,6 +40,10 @@ addons:
       - kalakris-cmake
     packages:
       - cmake
+      # This is only required for building release packages,
+      # but we include it everywhere as to not require `sudo: true`.
+      - ruby
+      - ruby-dev
 
 # OSX
 before_install: |

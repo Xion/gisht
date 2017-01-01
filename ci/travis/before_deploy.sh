@@ -13,16 +13,14 @@ fi
 # Release dependencies
 #
 
-# Install Ruby.
+# Install Ruby on OSX. (On Linux it is already installed in travis.yml)
 if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     brew update >/dev/null
     brew install ruby
-else
-    apt-get install ruby ruby-dev
 fi
 
 # Install fpm.
-_sudo gem install fpm
+$_sudo gem install fpm
 
 
 #
