@@ -16,10 +16,11 @@ RELEASE_DIR = Path.cwd() / 'release'
 @task(name="all")
 def all_(ctx):
     """Create all release packages."""
-    from tasks.release.fpm import deb, rpm, tar
+    from tasks.release.fpm import deb, rpm, tar_gz
 
     # Generic.
-    tar(ctx)
+    # tar(ctx)  # disabled
+    tar_gz(ctx)
 
     # Linux.
     deb(ctx)

@@ -5,6 +5,7 @@ This essentially a wrapper script around fpm (https://github.com/jordansissel/fp
 Requires fpm to be installed first, which may in turn require Ruby with C headers.
 Refer to fpm's README for installation instructions.
 """
+import gzip
 from itertools import starmap
 import logging
 import os
@@ -14,6 +15,7 @@ try:
     from shlex import quote
 except ImportError:
     from pipes import quote
+from tempfile import mkstemp
 
 from invoke import task
 from invoke.exceptions import Exit
@@ -58,6 +60,28 @@ def tar(ctx):
     logging.info("Preparing release tarball...")
     bundle(ctx, 'tar')
     logging.debug("Release tarball created.")
+
+
+@task
+def tar_gz(ctx):
+    """Create a gzip-compressed release tarball."""
+    ensure_fpm(ctx)
+    ensure_output_dir()
+    prepare_release(ctx)
+
+    logging.info("Preparing compressed release tarball...")
+
+    # Prepare the regular tarball but write it to a temporary file
+    tar_fd, tar_path = mkstemp('.tar', BIN + '-')
+    bundle(ctx, 'tar', package=tar_path)
+
+    # Compress that file with gzip.
+    tar_gz_path = str(OUTPUT_DIR / ('%s.tar.gz' % format_bundle_name(ctx)))
+    with os.fdopen(tar_fd, 'rb') as tar_f, \
+        gzip.open(tar_gz_path, 'wb') as tar_gz_f:
+            shutil.copyfileobj(tar_f, tar_gz_f)
+
+    logging.debug("Compressed release tarball created.")
 
 
 @task
@@ -136,6 +160,8 @@ def ensure_output_dir():
         logging.debug("Output directory created.")
 
 
+# TODO: this should be a class, given that ctx and package_info is shared
+# between several functions
 def bundle(ctx, target, **flags):
     """Create a release bundle by involving `fpm` with common parameters.
 
@@ -169,10 +195,10 @@ def bundle(ctx, target, **flags):
 
     # Use all this info to determine the final release package name:
     # the fpm output.
-    package_name = '%s-%s-%s' % (
-        package_info['name'], package_info['version'], arch)
-    flags.update(t=target,
-                 package=str(OUTPUT_DIR / ('%s.%s' % (package_name, target))))
+    package_name = format_bundle_name(ctx, package_info, arch)
+    flags['t'] = target
+    if 'package' not in flags:
+        flags['package'] = str(OUTPUT_DIR / ('%s.%s' % (package_name, target)))
 
     def format_flag(name, value):
         return '-%s %s' % (name if len(name) == 1 else '-' + name,
@@ -221,6 +247,13 @@ def read_package_info(cargo_toml=None):
     return result
 
 
+def format_bundle_name(ctx, package_info=None, arch=None):
+    """Format the name of the bundle, incl. app name, version, etc."""
+    package_info = package_info or read_package_info()
+    arch = arch or os.environ.get('ARCH') or get_architecture(ctx)
+    return '%s-%s-%s' % (package_info['name'], package_info['version'], arch)
+
+
 def get_architecture(ctx):
     """Build an string describing architecture of the current system.
     :return: Architecture string or 'unknown'
@@ -237,8 +270,8 @@ def get_architecture(ctx):
         logging.error("Running `uname` to obtain architecture info failed!")
         return result
 
-    os_name = uname_os.stdout.lower()  # e.g. 'Linux', 'Darwin'
-    hardware_name = uname_hardware.stdout  # e.g. 'x86_64'
+    os_name = uname_os.stdout.strip().lower()  # e.g. 'Linux', 'Darwin'
+    hardware_name = uname_hardware.stdout.strip()  # e.g. 'x86_64'
     return '%s-%s' % (hardware_name, os_name)
 
 
