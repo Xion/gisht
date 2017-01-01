@@ -76,11 +76,24 @@ before_deploy:
 deploy:
   provider: releases
   api_key:
-    secure: TODO
-  file: release/*
+    secure: Wma7Fxr3prV6doGV/TUgMB9o1XB6DMsp/qzovWzgdTwE39ewOhRRRgI7Nwj5SvLGQHwX2AyWDnZQ7q853hDmhPKAVSowcUzNcI75LdNrwobdvuzZBt3lPSw5OZiJrMIXJ049oQLTuuP9GYDl/cDNTDjdLA1wgpiuAVXdt+G2C3yaH0MQD3XMrzc/fUH2d1dRPGHOMfMuoVXRumtSS62hKeueAgvH7jPefqX95vzAiIJRuGF9aFW1qRhQXYIYQSsPtq/Y6IEBCxDYx+qFGLfhVlA/OKAEYB6oPsD2tldhofN0buoXSiJTy1WeTuf+uJn1PXeJ4ck4Zl7/yAwo5LWpxy2+Vu6Cjyj3+c8kEtwF2YofBJLLCqHEOduYPMFeMOB46rKQSYT/RAR9Fj/DTAPQRwMThdaRJbp6Poh3AvRrAvUUe/C2NMftnF7bE0dnVTF9YTj+isZPc6yNDWyzN39iE7D8GA3f6LDdcIR0JdwpmzevyfmXyipq3CPpTJa+Yv/I6Vl6P0sNtBf4LPBufxfQfPGG4BH9lyvoxnLM/A2ipBEYJhXY3p/CgZSBbb3GXKLXXvObuMNaqApD6VXDWKJ+jx/W74cbWSkQ2jyexKcXMqlmjlMycDnly+rH8CzgayFwlE4iNFAQmScjNYxsGP9VI+HjuI1TOEi8zGn7XlELwXs=
+  file: release/*-${TRAVIS_TAG}-*.*
   file_glob: true
   # Retain the built release artifacts (otherwise there is nothing to deploy).
   skip_cleanup: true
   on:
     tags: true
     condition: TRAVIS_RUST_VERSION = stable
+
+
+#
+# Meta
+#
+
+branches:
+  only:
+    # Run CI on pushes and PRs to master
+    - master
+    # Also on tags, so that deploys are triggered.
+    # (This regex matches semantic versions like v1.2.3-rc4+2016.02.22)
+    - /^\d+\.\d+\.\d+.*$/
