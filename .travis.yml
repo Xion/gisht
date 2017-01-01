@@ -23,7 +23,6 @@ matrix:
   include:
     - os: osx
       language: generic
-      rust: stable
   # Test on nightly Rust, but failures there won't break the build.
   allow_failures:
     - rust: nightly
@@ -40,8 +39,8 @@ addons:
       - kalakris-cmake
     packages:
       - cmake
-      # This is only required for building release packages,
-      # but we include it everywhere as to not require `sudo: true`.
+      # This is only needed for building release packages,
+      # but we include it everywhere so we don't need `sudo: required`.
       - ruby
       - ruby-dev
 
@@ -87,7 +86,8 @@ deploy:
   skip_cleanup: true
   on:
     tags: true
-    condition: $TRAVIS_RUST_VERSION = stable
+    # Deploy when artifacts from stable Rust (on Linux), or from the OSX build.
+    condition: $TRAVIS_RUST_VERSION = stable -o $TRAVIS_OS_NAME = osx
 
 
 #

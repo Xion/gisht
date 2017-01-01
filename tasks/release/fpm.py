@@ -15,7 +15,7 @@ try:
     from shlex import quote
 except ImportError:
     from pipes import quote
-from tempfile import mkstemp
+import tempfile
 
 from invoke import task
 from invoke.exceptions import Exit
@@ -71,13 +71,13 @@ def tar_gz(ctx):
 
     logging.info("Preparing compressed release tarball...")
 
-    # Prepare the regular tarball but write it to a temporary file
-    tar_fd, tar_path = mkstemp('.tar', BIN + '-')
+    # Prepare the regular tarball but write it to a temporary file.
+    tar_path = tempfile.mktemp('.tar', BIN + '-')
     bundle(ctx, 'tar', package=tar_path)
 
     # Compress that file with gzip.
     tar_gz_path = str(OUTPUT_DIR / ('%s.tar.gz' % format_bundle_name(ctx)))
-    with os.fdopen(tar_fd, 'rb') as tar_f, \
+    with open(tar_path, 'rb') as tar_f, \
         gzip.open(tar_gz_path, 'wb') as tar_gz_f:
             shutil.copyfileobj(tar_f, tar_gz_f)
 
