@@ -29,6 +29,7 @@ from tasks.release import RELEASE_DIR
 # in Cargo.toml (and optionally undergo transformations through functions).
 PACKAGE_INFO = dict(
     name=('package', 'name'),
+    version=('package', 'version'),
     description=('package', 'description'),
     url=('package', 'homepage'),
     license=('package', 'license'),
@@ -145,11 +146,8 @@ def bundle(ctx, target, **flags):
     """
     package_info = read_package_info()
 
-    # Define the fpm's input and output.
+    # Define the fpm's input.
     flags.update(s='dir', C=str(SOURCE_DIR))
-    flags.update(
-        t=target,
-        package=str(OUTPUT_DIR / ('%s.%s' % (package_info['name'], target))))
 
     # Provide package information.
     for key, value in package_info.items():
@@ -166,6 +164,15 @@ def bundle(ctx, target, **flags):
     arch = os.environ.get('ARCH')
     if arch:
         flags['architecture'] = arch
+    else:
+        arch = get_architecture(ctx)
+
+    # Use all this info to determine the final release package name:
+    # the fpm output.
+    package_name = '%s-%s-%s' % (
+        package_info['name'], package_info['version'], arch)
+    flags.update(t=target,
+                 package=str(OUTPUT_DIR / ('%s.%s' % (package_name, target))))
 
     def format_flag(name, value):
         return '-%s %s' % (name if len(name) == 1 else '-' + name,
@@ -212,6 +219,27 @@ def read_package_info(cargo_toml=None):
             result[field] = value
 
     return result
+
+
+def get_architecture(ctx):
+    """Build an string describing architecture of the current system.
+    :return: Architecture string or 'unknown'
+    """
+    result = 'unknown'
+
+    if not which(ctx, 'uname'):
+        logging.warning('`uname` not found, cannot determine architecture.')
+        return result
+
+    uname_os = ctx.run('uname -s', warn=True, hide=True)
+    uname_hardware = ctx.run('uname -m', warn=True, hide=True)
+    if not (uname_os.ok and uname_hardware.ok):
+        logging.error("Running `uname` to obtain architecture info failed!")
+        return result
+
+    os_name = uname_os.stdout.lower()  # e.g. 'Linux', 'Darwin'
+    hardware_name = uname_hardware.stdout  # e.g. 'x86_64'
+    return '%s-%s' % (hardware_name, os_name)
 
 
 # Utility functions
