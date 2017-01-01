@@ -87,7 +87,7 @@ deploy:
   on:
     tags: true
     # Deploy when artifacts from stable Rust (on Linux), or from the OSX build.
-    condition: $TRAVIS_RUST_VERSION = stable -o $TRAVIS_OS_NAME = osx
+    condition: $TRAVIS_RUST_VERSION = stable || $TRAVIS_OS_NAME = osx
 
 
 #
