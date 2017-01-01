@@ -17,11 +17,15 @@ fi
 if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     brew update >/dev/null
     brew install ruby
+
+    # Force bundler 1.12.5 because version 1.13 has issues,
+    # see https://github.com/fastlane/fastlane/issues/6065#issuecomment-246044617
+    gem uninstall bundler -v '>1.12.5' --force || echo "bundler >1.12.5 is not installed"
+    gem install bundler -v 1.12.5 --no-rdoc --no-ri --no-document --quiet
 fi
 
 # Install fpm.
-# (Pick specific version because 1.8.0+ seems to be borked, at least on OSX)
-$_sudo gem install fpm -v 1.6.3
+$_sudo gem install fpm
 
 
 #
