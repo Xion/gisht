@@ -70,13 +70,14 @@ def tar_gz(ctx):
     prepare_release(ctx)
 
     logging.info("Preparing compressed release tarball...")
+    bundler = Bundler(ctx, 'tar')
 
     # Prepare the regular tarball but write it to a temporary file.
     tar_path = tempfile.mktemp('.tar', BIN + '-')
-    bundle(ctx, 'tar', package=tar_path)
+    bundler.build(package=tar_path)
 
     # Compress that file with gzip.
-    tar_gz_path = str(OUTPUT_DIR / ('%s.tar.gz' % format_bundle_name(ctx)))
+    tar_gz_path = str(OUTPUT_DIR / ('%s.tar.gz' % bundler.bundle_name))
     with open(tar_path, 'rb') as tar_f, \
         gzip.open(tar_gz_path, 'wb') as tar_gz_f:
             shutil.copyfileobj(tar_f, tar_gz_f)
@@ -92,7 +93,7 @@ def deb(ctx):
     prepare_release(ctx)
 
     logging.info("Preparing Debian package...")
-    bundle(ctx, 'deb', prefix=LINUX_INSTALL_DIR)
+    Bundler(ctx, 'deb').build(prefix=LINUX_INSTALL_DIR)
     logging.debug("Debian package created.")
 
 
@@ -108,7 +109,7 @@ def rpm(ctx):
     prepare_release(ctx)
 
     logging.info("Preparing RedHat package...")
-    bundle(ctx, 'rpm', prefix=LINUX_INSTALL_DIR)
+    Bundler(ctx, 'rpm').build(prefix=LINUX_INSTALL_DIR)
     logging.debug("RedHat package created.")
 
 
@@ -160,119 +161,132 @@ def ensure_output_dir():
         logging.debug("Output directory created.")
 
 
-# TODO: this should be a class, given that ctx and package_info is shared
-# between several functions
-def bundle(ctx, target, **flags):
-    """Create a release bundle by involving `fpm` with common parameters.
+class Bundler(object):
+    """Creates a release bundle by invoking `fpm`."""
 
-    :param target: Release target, like "deb", "rpm", etc.
-    :param flags: Additional flags to be passed to fpm
+    UNKNOWN_ARCH = 'unknown'
 
-    :return: Invoke's process object
-    """
-    package_info = read_package_info()
+    def __init__(self, ctx, target):
+        """Constructor.
 
-    # Define the fpm's input.
-    flags.update(s='dir', C=str(SOURCE_DIR))
+        :param ctx: Invoke's task context
+        :param target: Release target, like "deb", "rpm", "tar", etc.
+        """
+        self._ctx = ctx
+        self._target = target
 
-    # Provide package information.
-    for key, value in package_info.items():
-        flags.setdefault(key, value)
-    flags.setdefault('vendor', "<unspecified>")
+        # Include architecture spec if known.
+        # (This env variable should be provided by a CI script).
+        try:
+            self._arch = os.environ['ARCH']
+        except KeyError:
+            self._arch = self._get_architecture()
 
-    # Use Gist SHA of HEAD revision as the --iteration value.
-    if 'iteration' not in flags:
-        sha = ctx.run('git rev-parse --short HEAD', hide=True).stdout.strip()
-        flags['iteration'] = sha
+        self._package = self._read_package_info()
 
-    # Include architecture spec if know.
-    # (This env variable should be provided by a CI script).
-    arch = os.environ.get('ARCH')
-    if arch:
-        flags['architecture'] = arch
-    else:
-        arch = get_architecture(ctx)
+    def _get_architecture(self):
+        """Build an string describing architecture of the current system.
+        :return: Architecture string or 'unknown'
+        """
+        if not self._which('uname'):
+            logging.warning('`uname` not found, cannot determine architecture.')
+            return self.UNKNOWN_ARCH
 
-    # Use all this info to determine the final release package name:
-    # the fpm output.
-    package_name = format_bundle_name(ctx, package_info, arch)
-    flags['t'] = target
-    if 'package' not in flags:
-        flags['package'] = str(OUTPUT_DIR / ('%s.%s' % (package_name, target)))
+        uname_os = self._run('uname -s', warn=True, hide=True)
+        uname_hardware = self._run('uname -m', warn=True, hide=True)
+        if not (uname_os.ok and uname_hardware.ok):
+            logging.error("Running `uname` to obtain architecture info failed!")
+            return self.UNKNOWN_ARCH
 
-    def format_flag(name, value):
-        return '-%s %s' % (name if len(name) == 1 else '-' + name,
-                           quote(value))
-    fpm_flags = ' '.join(starmap(format_flag, flags.items()))
+        os_name = uname_os.stdout.strip().lower()  # e.g. 'Linux', 'Darwin'
+        hardware_name = uname_hardware.stdout.strip()  # e.g. 'x86_64'
+        return '%s-%s' % (hardware_name, os_name)
 
-    # Determine the exact files that comprise the bundle.
-    source_files = [BIN]
-    for pattern in EXTRA_FILES:
-        for path in Path.cwd().glob(pattern):
-            try:
-                filename = path.relative_to(SOURCE_DIR)
-            except ValueError:
-                filename = path.relative_to(Path.cwd())
-            source_files.append(str(filename))
-    fpm_args = ' '.join(map(quote, source_files))
+    def _read_package_info(self, cargo_toml=None):
+        """Read package info from the [package] section of Cargo.toml.
 
-    fpm_cmdline = 'fpm --force --log error %s %s' % (fpm_flags, fpm_args)
-    logging.debug("Running %s" % fpm_cmdline)
-    return ctx.run(fpm_cmdline)
+        :return: Dictionary mapping PACKAGE_FIELDS to their values
+        """
+        cargo_toml = Path(cargo_toml or Path.cwd() / 'Cargo.toml')
+        with cargo_toml.open() as f:
+            package_conf = toml.load(f)
 
+        # PACKAGE_INFO defines how to obtain package info from Cargo.toml
+        # by providing either a tuple of subsequent keys to follow / transformations
+        # to apply; or a verbatim value.
+        result = {}
+        for field, spec in PACKAGE_INFO.items():
+            if isinstance(spec, tuple):
+                value = package_conf
+                for step in spec:
+                    value = step(value) if callable(step) else value[step]
+            else:
+                value = spec
+            if value is not None:
+                result[field] = value
 
-def read_package_info(cargo_toml=None):
-    """Read package info from the [package] section of Cargo.toml.
-
-    :return: Dictionary mapping PACKAGE_FIELDS to their values
-    """
-    cargo_toml = Path(cargo_toml or Path.cwd() / 'Cargo.toml')
-    with cargo_toml.open() as f:
-        package_conf = toml.load(f)
-
-    # PACKAGE_INFO defines how to obtain package info from Cargo.toml
-    # by providing either a tuple of subsequent keys to follow / transformations
-    # to apply; or a verbatim value.
-    result = {}
-    for field, spec in PACKAGE_INFO.items():
-        if isinstance(spec, tuple):
-            value = package_conf
-            for step in spec:
-                value = step(value) if callable(step) else value[step]
-        else:
-            value = spec
-        if value is not None:
-            result[field] = value
-
-    return result
-
-
-def format_bundle_name(ctx, package_info=None, arch=None):
-    """Format the name of the bundle, incl. app name, version, etc."""
-    package_info = package_info or read_package_info()
-    arch = arch or os.environ.get('ARCH') or get_architecture(ctx)
-    return '%s-%s-%s' % (package_info['name'], package_info['version'], arch)
-
-
-def get_architecture(ctx):
-    """Build an string describing architecture of the current system.
-    :return: Architecture string or 'unknown'
-    """
-    result = 'unknown'
-
-    if not which(ctx, 'uname'):
-        logging.warning('`uname` not found, cannot determine architecture.')
         return result
 
-    uname_os = ctx.run('uname -s', warn=True, hide=True)
-    uname_hardware = ctx.run('uname -m', warn=True, hide=True)
-    if not (uname_os.ok and uname_hardware.ok):
-        logging.error("Running `uname` to obtain architecture info failed!")
-        return result
+    @property
+    def bundle_name(self):
+        """Name of the release bundle. This is used as a filename."""
+        return '%s-%s-%s' % (
+            self._package['name'], self._package['version'], self._arch)
 
-    os_name = uname_os.stdout.strip().lower()  # e.g. 'Linux', 'Darwin'
-    hardware_name = uname_hardware.stdout.strip()  # e.g. 'x86_64'
-    return '%s-%s' % (hardware_name, os_name)
+    def build(self, **flags):
+        """Call fpm to create the release bundle.
+
+        :param flags: Additional flags to be passed to fpm
+
+        :return: Invoke's process object
+        """
+        # Define the fpm's input and output.
+        flags.update(s='dir', C=str(SOURCE_DIR))
+        flags.update(t=self._target)
+        flags.setdefault('package', str(
+            OUTPUT_DIR / ('%s.%s' % (self.bundle_name, self._target))))
+
+        # Provide package information.
+        for key, value in self._package.items():
+            flags.setdefault(key, value)
+        flags.setdefault('vendor', "<unspecified>")
+        flags.setdefault('architecture', self._arch)
+
+        # Use Gist SHA of HEAD revision as the --iteration value.
+        if 'iteration' not in flags:
+            sha = self._run(
+                'git rev-parse --short HEAD', hide=True).stdout.strip()
+            flags['iteration'] = sha
+
+        def format_flag(name, value):
+            return '-%s %s' % (name if len(name) == 1 else '-' + name,
+                               quote(value))
+        fpm_flags = ' '.join(starmap(format_flag, flags.items()))
+
+        # Determine the exact files that comprise the bundle.
+        source_files = [BIN]
+        for pattern in EXTRA_FILES:
+            for path in Path.cwd().glob(pattern):
+                try:
+                    filename = path.relative_to(SOURCE_DIR)
+                except ValueError:
+                    filename = path.relative_to(Path.cwd())
+                source_files.append(str(filename))
+        fpm_args = ' '.join(map(quote, source_files))
+
+        fpm_cmdline = 'fpm --force --log error %s %s' % (fpm_flags, fpm_args)
+        logging.debug("Running %s" % fpm_cmdline)
+        return self._run(fpm_cmdline)
+
+    # Utility methods
+
+    def _run(self, *args, **kwargs):
+        """Helper method to run subprocesses via Invoke's context."""
+        return self._ctx.run(*args, **kwargs)
+
+    def _which(self, prog):
+        """Check if given program is available."""
+        return which(self._ctx, prog)
 
 
 # Utility functions
