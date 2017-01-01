@@ -6,6 +6,7 @@ is NOT handled here.
 """
 from pathlib import Path
 import shutil
+import sys
 
 from invoke import Collection, task
 
@@ -13,18 +14,24 @@ from invoke import Collection, task
 RELEASE_DIR = Path.cwd() / 'release'
 
 
-@task(name="all")
-def all_(ctx):
+@task(name="all", help={
+    'platform': "Platform to build the releases for (as per sys.platform)",
+})
+def all_(ctx, platform=None):
     """Create all release packages."""
     from tasks.release.fpm import deb, rpm, tar_gz
+
+    platform = (platform or '').lower().strip() or sys.platform
+    is_platform = lambda p: platform == 'all' or platform.startswith(p)
 
     # Generic.
     # tar(ctx)  # disabled
     tar_gz(ctx)
 
-    # Linux.
-    deb(ctx)
-    rpm(ctx)
+    # Linux
+    if is_platform('linux'):
+        deb(ctx)
+        rpm(ctx)
 
 
 @task

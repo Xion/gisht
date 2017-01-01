@@ -30,7 +30,7 @@ _sudo gem install fpm
 #
 
 if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-    inv release.tar_gz
+    inv release --platform darwin
 else
-    inv release
+    inv release --platform linux
 fi
