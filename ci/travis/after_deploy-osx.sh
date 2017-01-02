@@ -13,6 +13,7 @@ DEST_DIR=pkg/homebrew
 DEPLOY_KEY_ENC=ci/travis/deploy_key.enc
 
 # Git repo information.
+BRANCH=master
 REPO=`git config remote.origin.url`
 SSH_REPO=${REPO/https:\/\/github.com\//git@github.com:}
 SHA=`git rev-parse --verify HEAD`
@@ -22,6 +23,8 @@ SHA=`git rev-parse --verify HEAD`
 # Deploying Homebrew formula
 #
 
+git checkout $BRANCH
+
 # Copy the generated formula (done in before_deploy: step)
 # to the destination directory.
 mkdir -p "$DEST_DIR"
@@ -29,7 +32,7 @@ cp -f -v "$SRC_DIR/$FORMULA" "$DEST_DIR/$FORMULA"
 
 # If this caused no changes, abort at this point.
 git add --intent-to-add "$DEST_DIR/$FORMULA"
-if [ -z `git diff --exit-code` ]; then
+if git diff --exit-code ; then
     echo "Homebrew formula unchanged, exiting."
     exit 0
 fi
@@ -51,4 +54,4 @@ eval `ssh-agent -s`
 ssh-add deploy_key
 
 # Push the changes.
-git push $SSH_REPO $TRAVIS_BRANCH
+git push $SSH_REPO $BRANCH
