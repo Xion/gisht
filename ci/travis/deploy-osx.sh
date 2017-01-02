@@ -60,7 +60,13 @@ git commit -m "Update Homebrew formula to version $TRAVIS_TAG (sha: $SHA)"
 chmod 600 deploy_key
 eval `ssh-agent -s`
 ssh-add -K deploy_key
-unset SSH_ASK_PASS
+
+# HACK: Make an ssh-askpass that just always returns true.
+# (It otherwise doesn't exist on Travis OSX image at all).
+# This is fine because the deploy key is password-less.
+SSH_ASKPASS=/usr/X11R6/bin/ssh-askpass
+sudo mkdir -p "$(dirname "$SSH_ASKPASS")"
+sudo ln -s /usr/bin/true "$SSH_ASKPASS"
 
 # Push the changes.
 git push $SSH_REPO $BRANCH
