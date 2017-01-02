@@ -28,6 +28,7 @@ mkdir -p "$DEST_DIR"
 cp -f -v "$SRC_DIR/$FORMULA" "$DEST_DIR/$FORMULA"
 
 # If this caused no changes, abort at this point.
+git add --intent-to-add "$DEST_DIR/$FORMULA"
 if [ -z `git diff --exit-code` ]; then
     echo "Homebrew formula unchanged, exiting."
     exit 0
