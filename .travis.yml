@@ -11,6 +11,9 @@ env:
     - PROJECT_NAME=gisht
     - LINUX_ARCH=x86_64-unknown-linux-gnu
     - OSX_ARCH=x86_64-apple-darwin
+    # For after_deploy: hook, to upload Homebrew formula back to the repo.
+    - DEPLOY_ENC_LABEL=df5d3ee4baa7
+    - COMMIT_AUTHOR_EMAIL=karol.kuczmarski@gmail.com
 
 os:
   - linux
@@ -88,6 +91,11 @@ deploy:
     tags: true
     # Deploy when artifacts from stable Rust (on Linux), or from the OSX build.
     condition: $TRAVIS_RUST_VERSION = stable || $TRAVIS_OS_NAME = osx
+
+after_deploy: |
+  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+    ./ci/travis/after_deploy-osx.sh
+  fi
 
 
 #
