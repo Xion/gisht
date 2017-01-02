@@ -44,7 +44,7 @@ fi
 git config user.name "Travis CI"
 git config user.email "$COMMIT_AUTHOR_EMAIL"
 git add "$DEST_DIR/$FORMULA"
-git commit -m "Update Homebrew formula to version $TRAVIS_TAG (sha: $SHA)"
+git commit -m "Update Homebrew formula to version $TRAVIS_TAG (sha: $SHA) [ci skip]"
 
 # Get the deploy key by using Travis's stored variables to decrypt deploy_key.enc
 (
