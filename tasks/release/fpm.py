@@ -58,7 +58,7 @@ def tar(ctx):
     prepare_release(ctx)
 
     logging.info("Preparing release tarball...")
-    bundle(ctx, 'tar')
+    Bundler(ctx, 'tar').build()
     logging.debug("Release tarball created.")
 
 
@@ -83,6 +83,7 @@ def tar_gz(ctx):
             shutil.copyfileobj(tar_f, tar_gz_f)
 
     logging.debug("Compressed release tarball created.")
+    return tar_gz_path
 
 
 @task
@@ -209,7 +210,7 @@ class Bundler(object):
         """
         cargo_toml = Path(cargo_toml or Path.cwd() / 'Cargo.toml')
         with cargo_toml.open() as f:
-            package_conf = toml.load(f)
+            manifest = toml.load(f)
 
         # PACKAGE_INFO defines how to obtain package info from Cargo.toml
         # by providing either a tuple of subsequent keys to follow / transformations
@@ -217,7 +218,7 @@ class Bundler(object):
         result = {}
         for field, spec in PACKAGE_INFO.items():
             if isinstance(spec, tuple):
-                value = package_conf
+                value = manifest
                 for step in spec:
                     value = step(value) if callable(step) else value[step]
             else:
