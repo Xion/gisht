@@ -60,6 +60,7 @@ git commit -m "Update Homebrew formula to version $TRAVIS_TAG (sha: $SHA)"
 chmod 600 deploy_key
 eval `ssh-agent -s`
 ssh-add -K deploy_key
+unset SSH_ASK_PASS
 
 # Push the changes.
 git push $SSH_REPO $BRANCH

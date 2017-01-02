@@ -78,7 +78,6 @@ before_deploy:
 
   # Build the release bundles
   - . ./ci/travis/before_deploy.sh
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then ./ci/travis/before_deploy-osx.sh ; fi
 
 deploy:
   # Deploy build artifacts to GitHub Releases.
