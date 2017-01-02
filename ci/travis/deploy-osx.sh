@@ -69,4 +69,5 @@ sudo mkdir -p "$(dirname "$SSH_ASKPASS")"
 sudo ln -s /usr/bin/true "$SSH_ASKPASS"
 
 # Push the changes.
+ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
 git push $SSH_REPO $BRANCH
