@@ -5,7 +5,7 @@
 
 # Based on https://gist.github.com/domenic/ec8b0fc8ab45f39403dd
 
-set -ex
+set -e
 
 FORMULA=gisht.rb
 SRC_DIR=release
@@ -59,7 +59,7 @@ git commit -m "Update Homebrew formula to version $TRAVIS_TAG (sha: $SHA)"
 )
 chmod 600 deploy_key
 eval `ssh-agent -s`
-ssh-add deploy_key
+ssh-add -K deploy_key
 
 # Push the changes.
 git push $SSH_REPO $BRANCH
