@@ -20,18 +20,28 @@ RELEASE_DIR = Path.cwd() / 'release'
 def all_(ctx, platform=None):
     """Create all release packages."""
     from tasks.release.fpm import deb, rpm, tar_gz
+    from tasks.release.homebrew import brew
 
     platform = (platform or '').lower().strip() or sys.platform
     is_platform = lambda p: platform == 'all' or platform.startswith(p)
-
-    # Generic.
-    # tar(ctx)  # disabled
-    tar_gz(ctx)
+    built_any = False
 
     # Linux
     if is_platform('linux'):
         deb(ctx)
         rpm(ctx)
+        built_any = True
+
+    # OS X
+    if is_platform('darwin'):
+        brew(ctx)
+        built_any = True
+
+    # Fallback / miscellaneous release bundles
+    if not built_any or platform == 'all':
+        # Generic.
+        # tar(ctx)  # disabled
+        tar_gz(ctx)
 
 
 @task
