@@ -59,7 +59,7 @@ git commit -m "Update Homebrew formula to version $TRAVIS_TAG (sha: $SHA)"
 )
 chmod 600 deploy_key
 eval `ssh-agent -s`
-ssh-add -K deploy_key
+ssh-add deploy_key
 
 # HACK: Make an ssh-askpass that just always returns true.
 # (It otherwise doesn't exist on Travis OSX image at all).
