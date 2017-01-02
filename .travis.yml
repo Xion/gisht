@@ -78,6 +78,7 @@ before_deploy:
 
   # Build the release bundles
   - . ./ci/travis/before_deploy.sh
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]];    then ./ci/travis/before_deploy-osx.sh ; fi
 
 deploy:
   # Deploy build artifacts to GitHub Releases.
@@ -112,3 +113,8 @@ branches:
     # Also on tags, so that deploys are triggered.
     # (This regex matches semantic versions like v1.2.3-rc4+2016.02.22)
     - /^\d+\.\d+\.\d+.*$/
+
+git:
+  # Don't set this to 1
+  # (see note at https://docs.travis-ci.com/user/customizing-the-build#Git-Clone-Depth)
+  depth: 5

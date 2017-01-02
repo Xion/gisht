@@ -35,7 +35,7 @@ cp -f -v "$SRC_DIR/$FORMULA" "$DEST_DIR/$FORMULA"
 
 # If this caused no changes, abort at this point.
 git add --intent-to-add "$DEST_DIR/$FORMULA"
-if git diff --exit-code ; then
+if git diff --quiet ; then
     echo "Homebrew formula unchanged, exiting."
     exit 0
 fi
@@ -47,11 +47,16 @@ git add "$DEST_DIR/$FORMULA"
 git commit -m "Update Homebrew formula to version $TRAVIS_TAG (sha: $SHA)"
 
 # Get the deploy key by using Travis's stored variables to decrypt deploy_key.enc
-ENCRYPTED_KEY_VAR="encrypted_${DEPLOY_ENC_LABEL}_key"
-ENCRYPTED_IV_VAR="encrypted_${DEPLOY_ENC_LABEL}_iv"
-ENCRYPTED_KEY=${!ENCRYPTED_KEY_VAR}
-ENCRYPTED_IV=${!ENCRYPTED_IV_VAR}
-openssl aes-256-cbc -K $ENCRYPTED_KEY -iv $ENCRYPTED_IV -in $DEPLOY_KEY_ENC -out deploy_key -d
+(
+    # Disable echo as to not leak the secrets below.
+    set +x
+
+    ENCRYPTED_KEY_VAR="encrypted_${DEPLOY_ENC_LABEL}_key"
+    ENCRYPTED_IV_VAR="encrypted_${DEPLOY_ENC_LABEL}_iv"
+    ENCRYPTED_KEY=${!ENCRYPTED_KEY_VAR}
+    ENCRYPTED_IV=${!ENCRYPTED_IV_VAR}
+    openssl aes-256-cbc -K $ENCRYPTED_KEY -iv $ENCRYPTED_IV -in $DEPLOY_KEY_ENC -out deploy_key -d
+)
 chmod 600 deploy_key
 eval `ssh-agent -s`
 ssh-add deploy_key
