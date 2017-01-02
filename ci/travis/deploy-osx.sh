@@ -5,7 +5,7 @@
 
 # Based on https://gist.github.com/domenic/ec8b0fc8ab45f39403dd
 
-set -e
+set -ex
 
 FORMULA=gisht.rb
 SRC_DIR=release
@@ -23,11 +23,10 @@ SHA=`git rev-parse --verify HEAD`
 # Deploying Homebrew formula
 #
 
-# Ensure we have sufficient history to commit to the target branch.
+# Ensure we are on the target $BRANCH.
 # (This is necessary since the script will be invoked for tag pushes).
 git fetch --unshallow
-git fetch origin $BRANCH
-git checkout $BRANCH
+git checkout -b $BRANCH FETCH_HEAD
 
 # Copy the generated formula (done in before_deploy: step)
 # to the destination directory.
