@@ -6,7 +6,7 @@ class Gisht < Formula
   desc "Gists in the shell"
   homepage "https://github.com/Xion/gisht"
   url "https://github.com/Xion/gisht/releases/download/#{version}/gisht-#{version}-x86_64-apple-darwin.tar.gz"
-  sha256 "d69cd71a0518eec3a09cd8b686beeb6a779bb06ac909a198f1c98c61fa1259b5"
+  sha256 "63bced8a7d2789e7d5e9e4db119c18849de6e4b591cda6a03fd8b9b63504b690"
 
   def install
     bin.install "gisht"
