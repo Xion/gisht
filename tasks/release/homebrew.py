@@ -43,8 +43,8 @@ end
 """.strip()
 
 # Template for the URL to the compiled bundle.
-# (This is also a Python template string by #{those_placeholders} are Ruby ones
-#  and are not touched by the string.Template.substitute).
+# (This is too a Python template string but #{those_placeholders} are Ruby ones
+#  and are not touched by string.Template.substitute).
 URL_TEMPLATE = ("$repository/releases/download/#{version}/"
                 "$name-#{version}-x86_64-apple-darwin.tar.gz")
 

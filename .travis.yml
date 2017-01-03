@@ -92,7 +92,7 @@ deploy:
       tags: true
       # Deploy when artifacts from stable Rust (on Linux), or from the OSX build.
       condition: $TRAVIS_RUST_VERSION = stable || $TRAVIS_OS_NAME = osx
-  # Commit & push the Hoembrew formula (which is built in before_deploy:).
+  # Commit & push the Homebrew formula (which is built in before_deploy:).
   - provider: script
     script: ./ci/travis/deploy-osx.sh
     skip_cleanup: true

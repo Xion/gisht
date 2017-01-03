@@ -20,8 +20,11 @@ if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
 
     # Force bundler 1.12.5 because version 1.13 has issues,
     # see https://github.com/fastlane/fastlane/issues/6065#issuecomment-246044617
-    gem uninstall bundler -v '>1.12.5' --force || echo "bundler >1.12.5 is not installed"
-    gem install bundler -v 1.12.5 --no-rdoc --no-ri --no-document --quiet
+    if gem uninstall bundler -v '>1.12.5' --force ; then
+        gem install bundler -v 1.12.5 --no-rdoc --no-ri --no-document --quiet
+    else
+        echo "bundler is already in a working version, not installing 1.12.5"
+    fi
 fi
 
 # Install fpm.
