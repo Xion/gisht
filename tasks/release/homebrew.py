@@ -30,6 +30,9 @@ class $name < Formula
   url "$url"
   sha256 "$sha"
 
+  depends_on "openssl"
+  depends_on "libssh2"
+
   def install
     bin.install "$bin"
     # TODO: generate man pages

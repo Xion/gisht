@@ -8,6 +8,9 @@ class Gisht < Formula
   url "https://github.com/Xion/gisht/releases/download/#{version}/gisht-#{version}-x86_64-apple-darwin.tar.gz"
   sha256 "63bced8a7d2789e7d5e9e4db119c18849de6e4b591cda6a03fd8b9b63504b690"
 
+  depends_on "openssl"
+  depends_on "libssh2"
+
   def install
     bin.install "gisht"
     # TODO: generate man pages
