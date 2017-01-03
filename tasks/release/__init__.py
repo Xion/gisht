@@ -23,7 +23,10 @@ def all_(ctx, platform=None):
     from tasks.release.homebrew import brew
 
     platform = (platform or '').lower().strip() or sys.platform
+    if platform in ('osx', 'mac', 'macosx'):
+        platform = 'darwin'
     is_platform = lambda p: platform == 'all' or platform.startswith(p)
+
     built_any = False
 
     # Linux
