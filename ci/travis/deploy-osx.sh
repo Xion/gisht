@@ -61,12 +61,10 @@ chmod 600 deploy_key
 eval `ssh-agent -s`
 ssh-add deploy_key
 
-# HACK: Make an ssh-askpass that just always returns true.
-# (It otherwise doesn't exist on Travis OSX image at all).
+# HACK: Make ssh-askpass that just always returns empty string with success.
+# (The default SSH_ASKPASS otherwise doesn't exist in Travis OSX image at all).
 # This is fine because the deploy key is password-less.
-SSH_ASKPASS=/usr/X11R6/bin/ssh-askpass
-sudo mkdir -p "$(dirname "$SSH_ASKPASS")"
-sudo ln -s /usr/bin/true "$SSH_ASKPASS"
+export SSH_ASKPASS=/usr/bin/true
 
 # Push the changes.
 ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
