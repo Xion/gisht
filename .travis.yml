@@ -53,10 +53,6 @@ before_install: |
     . ./ci/travis/before_install-osx.sh
   fi
 
-#
-# Test script
-#
-
 install: |
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     pip install -r requirements-dev.txt
@@ -64,7 +60,16 @@ install: |
     pip install --user -r requirements-dev.txt
   fi
 
-script: inv test
+#
+# Test script
+#
+
+script: |
+  if [[ -z "$TRAVIS_TAG" ]]; then
+    inv test
+  else
+    inv test --release
+  fi
 
 
 #
