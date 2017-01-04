@@ -137,9 +137,9 @@ impl Host for Basic {
         try!(self.ensure_host_id(gist));
         let gist = self.resolve_gist(gist);
 
-        debug!("Building URL for {:?}", gist);
+        trace!("Building URL for {:?}", gist);
         let url = self.html_url_pattern.replace(ID_PLACEHOLDER, gist.id.as_ref().unwrap());
-        trace!("Browser URL for {:?}: {}", gist, url);
+        debug!("Browser URL for {:?}: {}", gist, url);
         Ok(url)
     }
 
