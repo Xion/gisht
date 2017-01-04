@@ -122,3 +122,7 @@ git:
   # Don't set this to 1
   # (see note at https://docs.travis-ci.com/user/customizing-the-build#Git-Clone-Depth)
   depth: 5
+
+cache:
+  - cargo
+  - pip

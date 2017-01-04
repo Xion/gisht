@@ -64,7 +64,7 @@ def brew(ctx):
     sha256 = hex_digest(bundle, 'sha256')
     variables['sha'] = sha256
 
-    # Format the URL where the bundle will have been upload to.
+    # Format the URL where the bundle will have been uploaded to.
     url = render(URL_TEMPLATE, **variables)
     variables['url'] = url
 
