@@ -5,7 +5,7 @@ Gists in the shell
 [![Build Status](https://img.shields.io/travis/Xion/gisht.svg)](https://travis-ci.org/Xion/gisht)
 [![License](https://img.shields.io/github/license/Xion/gisht.svg)](https://github.com/Xion/gisht/blob/master/LICENSE)
 
-With *gisht*, you can run scripts published as GitHub gists with a single command::
+With *gisht*, you can run scripts published as GitHub (or other) gists with a single command::
 
     gisht Xion/git-today
 
@@ -15,7 +15,7 @@ Magic!
 ## Usage
 
     gisht [OPTIONS] [SUBCOMMAND]
-    
+
     OPTIONS:
         -c, --cached     Operate only on gists available locally
         -f, --fetch      Always fetch the gist from a remote host
@@ -23,7 +23,7 @@ Magic!
         -q, --quiet      Decrease logging verbosity
         -H, --help       Prints help information
         -V, --version    Prints version information
-    
+
     SUBCOMMANDS:
         run      Run the specified gist [aliases: exec]
         which    Output the path to gist's binary
@@ -31,15 +31,15 @@ Magic!
         open     Open the gist's webpage [aliases: show]
         info     Display summary information about the gist [aliases: stat]
         help     Prints this message or the help of the given subcommand(s)
-    
+
     Hint: `gisht run GIST` can be shortened to just `gisht GIST`.
     If you want to pass arguments, put them after `--` (two dashes), like this:
-    
+
     	gisht Octocat/greet -- "Hello world" --cheerful
 
 ## Installation
 
-Binaries are available for Linux and Mac.
+[Binaries are available](https://github.com/Xion/gisht/releases) for Linux and Mac.
 
 If you use **Mac OS X**, `gisht` can be installed with **Homebrew**:
 
