@@ -1,10 +1,11 @@
 //! Utility functions shared by multiple other modules.
 
 use std::io::Read;
+use std::str::FromStr;
 
 use hyper::client::Response;
 use hyper::header::ContentLength;
-use rustc_serialize::json::Json;
+use serde_json::Value as Json;
 
 
 /// Read HTTP response from hyper and parse it as JSON.

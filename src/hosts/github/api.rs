@@ -5,7 +5,7 @@ use std::io;
 
 use hyper::client::{Client, Response};
 use hyper::header::UserAgent;
-use rustc_serialize::json::Json;
+use serde_json::Value as Json;
 use url::Url;
 
 use ::USER_AGENT;
@@ -146,7 +146,7 @@ impl<'o> GistsIterator<'o> {
 
     /// Convert a JSON representation of the gist into a Gist object.
     fn gist_from_json(&self, gist: &Json) -> Option<Gist> {
-        let id = gist["id"].as_string().unwrap();
+        let id = gist.pointer("id").and_then(Json::as_str).unwrap();
         let name = match gist_name_from_info(&gist) {
             Some(name) => name,
             None => {
@@ -201,7 +201,7 @@ pub fn build_gist_info(info: &Json, data: &[Datum]) -> gist::Info {
     let mut result = gist::InfoBuilder::new();
     for datum in data {
         if let Some(field) = INFO_FIELDS.get(&datum) {
-            match info.find(field).and_then(|f| f.as_string()) {
+            match info.find(field).and_then(Json::as_str) {
                 Some(value) => { result.set(datum, value); },
                 None => { warn!("Missing info key '{}' in gist JSON", field); },
             }
@@ -237,9 +237,7 @@ pub fn gist_name_from_info(info: &Json) -> Option<&str> {
 /// Retrieve gist owner from the parsed JSON of gist info.
 /// This may be an anonymous name.
 pub fn gist_owner_from_info(info: &Json) -> &str {
-    info.find_path(&["owner", "login"])
-        .and_then(|l| l.as_string())
-        .unwrap_or(ANONYMOUS)
+    info.find_path(&["owner", "login"]).and_then(Json::as_str).unwrap_or(ANONYMOUS)
 }
 
 

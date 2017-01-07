@@ -14,7 +14,7 @@
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate maplit;
              extern crate regex;
-             extern crate rustc_serialize;
+             extern crate serde_json;
              extern crate shlex;
              extern crate slog_envlogger;
              extern crate slog_stdlog;

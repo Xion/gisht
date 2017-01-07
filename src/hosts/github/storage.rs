@@ -111,7 +111,7 @@ pub fn clone_gist<G: AsRef<Gist>>(gist: G) -> io::Result<()> {
         None => {
             trace!("Need to get clone URL from GitHub for gist {}", gist.uri);
             let info = try!(api::get_gist_info(&gist.id.as_ref().unwrap()));
-            let url = match info.find("git_pull_url").and_then(|u| u.as_string()) {
+            let url = match info.find("git_pull_url").and_then(|u| u.as_str()) {
                 Some(url) => url.to_owned(),
                 None => {
                     error!("Gist info for {} doesn't contain git_pull_url", gist.uri);
