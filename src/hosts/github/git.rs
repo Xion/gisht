@@ -49,7 +49,7 @@ pub fn reset_merge<P: AsRef<Path>>(repo_path: P) -> io::Result<()> {
 
     // Reset (--hard) back to HEAD, and then cleanup the repository state
     // so that MERGE_HEAD doesn't exist anymore, effectively aborting the merge.
-    try!(|| -> Result<(), git2::Error> {
+    || -> Result<(), git2::Error> {
         let head_revspec = try!(repo.revparse("HEAD"));
         let head = head_revspec.to().unwrap();
         let mut checkout = {
@@ -59,9 +59,7 @@ pub fn reset_merge<P: AsRef<Path>>(repo_path: P) -> io::Result<()> {
         };
         try!(repo.reset(&head, git2::ResetType::Hard, Some(&mut checkout)));
         repo.cleanup_state()
-    }().map_err(to_io_error));
-
-    Ok(())
+    }().map_err(to_io_error)
 }
 
 

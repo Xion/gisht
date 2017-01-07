@@ -37,8 +37,9 @@ pub fn needs_update<G: AsRef<Gist>>(gist: G) -> bool {
     match now.duration_since(last) {
         Ok(duration) => duration > *UPDATE_INTERVAL,
         Err(err) => {
-            warn!("Last update time of gist {} is in the future ({}s from now). \
-                   Assuming an update is needed.", gist.uri, err.duration().as_secs());
+            let millis = err.duration().as_secs() * 1000 + err.duration().subsec_nanos() as u64 / 1000;
+            warn!("Last update time of gist {} is in the future ({}ms from now). \
+                   Assuming an update is needed.", gist.uri, millis);
             true
         },
     }
