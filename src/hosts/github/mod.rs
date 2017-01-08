@@ -129,7 +129,7 @@ impl Host for GitHub {
         };
 
         let id = captures.name("id").unwrap();
-        debug!("URL {} points to a GitHub gist: ID={}", orig_url, id);
+        trace!("URL {} points to a GitHub gist: ID={}", orig_url, id);
 
         // Obtain gist information using GitHub API.
         // Note that gist owner may be in the URL already, or we may need to get it
@@ -147,7 +147,7 @@ impl Host for GitHub {
         // Return the resolved gist.
         let uri = gist::Uri::new(ID, owner, name).unwrap();
         let gist = Gist::from_uri(uri).with_id(id);
-        trace!("URL resolves to GitHub gist {} (ID={})", gist.uri, gist.id.as_ref().unwrap());
+        debug!("URL resolves to GitHub gist {} (ID={})", gist.uri, gist.id.as_ref().unwrap());
         Some(Ok(gist))
     }
 }

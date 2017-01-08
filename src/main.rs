@@ -24,7 +24,7 @@
              extern crate url;
              extern crate webbrowser;
 
-// `slog` must precede `log` in declarations here, because we want to simultenously:
+// `slog` must precede `log` in declarations here, because we want to simultaneously:
 // * use the standard `log` macros (at least for a while)
 // * be able to initiaize the slog logger using slog macros like o!()
 #[macro_use] extern crate slog;
@@ -227,18 +227,32 @@ fn decode_gist(opts: &Options) -> Gist {
 
 /// Ask each of the known gist hosts if they can resolve this URL into a gist.
 fn gist_from_url(url: &str) -> Option<Gist> {
+    let mut gists = Vec::new();
+
     for (id, host) in &*hosts::HOSTS {
         if let Some(res) = host.resolve_url(url) {
             let gist = res.unwrap_or_else(|err| {
-                error!("Failed to download {} gist from a URL ({}): {}",
+                error!("Error asking {} to resolve gist from URL `{}`: {}",
                     host.name(), url, err);
                 exit(exitcode::EX_IOERR);
             });
             trace!("URL `{}` identified as `{}` ({}) gist", url, id, host.name());
-            return Some(gist);
+            gists.push(gist);
         }
     }
-    None
+
+    // If more that one host matches, it's an inconsistency in host definitions.
+    // Since we cannot determine with host "wins", we can only bail.
+    if gists.len() > 1 {
+        let hosts_csv = gists.into_iter().map(|gist| {
+            let host = gist.uri.host();
+            format!("{} ({})", host.name(), host.id())
+        }).collect::<Vec<_>>().join(", ");
+        error!("Multiple matching hosts for URL `{}`: {}", url, hosts_csv);
+        exit(exitcode::EX_CONFIG);
+    }
+
+    gists.pop()
 }
 
 

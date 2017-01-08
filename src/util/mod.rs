@@ -79,4 +79,5 @@ pub mod exitcode {
     pub const EX_OSFILE: ExitCode = 72;
     pub const EX_IOERR: ExitCode = 74;
     pub const EX_TEMPFAIL: ExitCode = 75;
+    pub const EX_CONFIG: ExitCode = 78;
 }
