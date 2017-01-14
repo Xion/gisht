@@ -4,6 +4,7 @@ Tasks for preparing release bundles for various platform.
 Actual _deployment_ of those releases (e.g. as GitHub Releases)
 is NOT handled here.
 """
+import logging
 from pathlib import Path
 import shutil
 import sys

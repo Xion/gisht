@@ -74,7 +74,7 @@ lazy_static! {
     /// User-Agent header that the program uses for all outgoing HTTP requests.
     static ref USER_AGENT: String = match *VERSION {
         Some(version) => format!("{}/{}", *NAME, version),
-        None => "gisht".to_owned(),
+        None => String::from(*NAME),
     };
 }
 
@@ -258,7 +258,7 @@ fn display_warning() -> bool {
 fn format_warning_message() -> String {
     const PREFIX: &'static str = "WARNING";
     const WARNING: &'static [&'static str] = &[
-        "gisht is used to download & run code from a remote source.",
+        "gisht is used to download & run code from remote sources.",
         "",
         "Never run gists that you haven't authored, and/or do not trust.",
         "Doing so is dangerous, and may expose your system to security risks!",

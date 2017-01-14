@@ -90,8 +90,9 @@ fn get_matches_with_completion<'a, 'p, I, T>(parser: Parser<'p>, argv: I) -> cla
     // and quit immediately.
     if let Some(shell) = matches.value_of(OPT_COMPLETION) {
         let shell = shell.parse::<Shell>().unwrap();
-        debug!("Printing autocompletion script for {}...", shell);
+        trace!("Printing autocompletion script for {}...", shell);
         create_full_parser().gen_completions_to(*NAME, shell, &mut io::stdout());
+        debug!("Autocompletion script for {} printed successuflly", shell);
         exit(0);
     }
 
@@ -490,11 +491,9 @@ mod tests {
         }
     }
 
-    /// Check if all gist subcommands are actually used in the argparser.
+    /// Check if all gist subcommands are correctly used in the argparser.
     #[test]
     fn commands_in_usage() {
-        // Usage will be returned as a failed parse Error's message.
-        // Empty argument list ensures we actually get the parse error.
         let mut usage = Vec::new();
         create_full_parser().write_help(&mut usage).unwrap();
         let usage = String::from_utf8(usage).unwrap();
@@ -502,6 +501,10 @@ mod tests {
         for cmd in Command::iter_variants() {
             assert!(usage.contains(cmd.name()),
                 "Usage string doesn't contain the '{}' command.", cmd.name());
+            for alias in cmd.aliases() {
+                assert!(usage.contains(alias),
+                    "Usage string doesn't contain the '{}' alias of '{}' command", alias, cmd.name());
+            }
         }
     }
 

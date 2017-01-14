@@ -90,6 +90,8 @@ def readme(ctx, release=False, verbose=False):
         f.write(readme_content)
 
 
+# TODO: consider doing this via a Cargp build script,
+# as described in https://blog.clap.rs/complete-me/
 @task(pre=[bin], help=HELP)
 def completions(ctx, release=False, verbose=False):
     """Create the autocomplete scripts for various shells."""
