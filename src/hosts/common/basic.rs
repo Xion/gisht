@@ -297,7 +297,7 @@ fn write_http_response_file<P: AsRef<Path>>(response: &mut Response, path: P) ->
             .map_err(|e| io::Error::new(e.kind(),
                 format!("Couldn't write file {}: {}", path.display(), e))));
         line_count += 1;
-        byte_count += line.len();
+        byte_count += line.len() + LINESEP.len();
     }
 
     trace!("Wrote {} line(s) ({} byte(s)) to {}", line_count, byte_count, path.display());

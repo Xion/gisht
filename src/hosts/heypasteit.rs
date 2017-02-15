@@ -1,6 +1,5 @@
 //! Module implementing heypasteit.com as gist host.
 
-
 use regex::Regex;
 
 use hosts::common::Basic;
