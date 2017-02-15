@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::io;
 
+use hyper;
 use hyper::client::{Client, Response};
 use hyper::header::UserAgent;
 use serde_json::Value as Json;
@@ -82,10 +83,13 @@ impl<'o> Iterator for GistsIterator<'o> {
         // If we don't have any cached gists in JSON form,
         // talk to the GitHub API to obtain the next (or first) page.
         if self.gists_json_array.is_none() && self.gists_url.is_some() {
-            self.try_fetch_gists();
+            if let Err(error) = self.try_fetch_gists() {
+                warn!("Error listing {}'s GitHub gists: {}", self.owner, error);
+                return None;
+            }
         }
 
-        // Try once more. If we don't get a gist time, it means we're done.
+        // Try once more. If we don't get a gist this time, it means we're done.
         self.next_cached()
     }
 }
@@ -110,17 +114,16 @@ impl<'o> GistsIterator<'o> {
     }
 
     /// Try to fetch the next page of gists from GitHub API.
-    fn try_fetch_gists(&mut self) {
+    fn try_fetch_gists(&mut self) -> Result<(), hyper::Error> {
         assert!(self.gists_json_array.is_none());
         assert_eq!(0, self.index);
 
         let gists_url = self.gists_url.clone().unwrap();
         trace!("Listing GitHub gists from {}", gists_url);
 
-        // TODO: handle errors here, and stop iteration prematurely
-        let mut resp = self.http.get(&*gists_url)
+        let mut resp = try!(self.http.get(&*gists_url)
             .header(UserAgent(USER_AGENT.clone()))
-            .send().unwrap();
+            .send());
 
         // Parse the response as JSON array and extract gist names from it.
         let gists_json = read_json(&mut resp);
@@ -136,12 +139,13 @@ impl<'o> GistsIterator<'o> {
         if let Some(&Link(ref links)) = resp.headers.get::<Link>() {
             if let Some(next) = links.get("next") {
                 self.gists_url = Some(next.url.clone());
-                return;
+                return Ok(());
             }
         }
 
         debug!("Got to the end of gists for GitHub user {}", self.owner);
         self.gists_url = None;
+        Ok(())
     }
 
     /// Convert a JSON representation of the gist into a Gist object.

@@ -199,9 +199,10 @@ impl Basic {
         // Download the gist using the raw URL pattern.
         let url = self.raw_url_pattern.replace(ID_PLACEHOLDER, gist.id.as_ref().unwrap());
         debug!("Downloading {} gist from {}", self.name, url);
-        let mut resp = http.get(&url)
+        let mut resp = try!(http.get(&url)
             .header(UserAgent(USER_AGENT.clone()))
-            .send().unwrap();
+            .send()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
 
         // Save it under the gist path.
         // Note that Gist::path for basic gists points to a single file, not a directory,
