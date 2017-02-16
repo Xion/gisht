@@ -114,7 +114,7 @@ impl<'o> GistsIterator<'o> {
     }
 
     /// Try to fetch the next page of gists from GitHub API.
-    fn try_fetch_gists(&mut self) -> Result<(), hyper::Error> {
+    fn try_fetch_gists(&mut self) -> hyper::Result<()> {
         assert!(self.gists_json_array.is_none());
         assert_eq!(0, self.index);
 

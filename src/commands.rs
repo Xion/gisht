@@ -179,7 +179,11 @@ pub fn show_gist_info(gist: &Gist) -> ! {
         panic!("Failed to obtain information about gist {}: {}", gist.uri, e);
     });
     match maybe_info {
-        Some(info) => { print!("{}", info); exit(exitcode::EX_OK) },
+        Some(info) => {
+            debug!("Successfully obtained information on {:?}", gist);
+            print!("{}", info);
+            exit(exitcode::EX_OK);
+        },
         None => {
             warn!("No information available about gist {}", gist.uri);
             exit(exitcode::EX_UNAVAILABLE);
@@ -193,7 +197,21 @@ mod tests {
     #[cfg(unix)]
     mod unix {
         use shlex;
+        use regex::Regex;
         use super::super::COMMON_INTERPRETERS;
+
+        #[test]
+        fn interpreter_file_extensions() {
+            lazy_static! {
+                static ref EXTENSION_RE: Regex = Regex::new("^[a-z]+$").unwrap();
+            }
+            for ext in COMMON_INTERPRETERS.keys() {
+                assert!(!ext.starts_with("."),
+                    "`{}` extension must not start with a dot", ext);
+                assert!(EXTENSION_RE.is_match(ext),
+                    "`{}` extension doesn't match the expected form {}", ext, *EXTENSION_RE);
+            }
+        }
 
         #[test]
         fn interpreter_command_placeholders() {
