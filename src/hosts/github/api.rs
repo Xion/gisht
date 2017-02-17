@@ -136,9 +136,9 @@ impl<'o> GistsIterator<'o> {
         }
 
         // Determine the URL to get the next page of gists from.
-        if let Some(&Link(ref links)) = resp.headers.get::<Link>() {
-            if let Some(next) = links.get("next") {
-                self.gists_url = Some(next.url.clone());
+        if let Some(ref link) = resp.headers.get::<Link>() {
+            if let Some(next) = link.url("next") {
+                self.gists_url = Some(next.into());
                 return Ok(());
             }
         }
