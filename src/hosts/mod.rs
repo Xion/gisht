@@ -100,7 +100,7 @@ lazy_static! {
         bpaste::ID => Arc::new(bpaste::create()) as Arc<Host>,
         mozilla::ID => Arc::new(mozilla::create()) as Arc<Host>,
         paste::ID => Arc::new(paste::create()) as Arc<Host>,
-        hastebin::ID => Arc::new(hastebin::create()) as Arc<Host>,
+        hastebin::ID => Arc::new(hastebin::Hastebin::new()) as Arc<Host>,
     };
 }
 
