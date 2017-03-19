@@ -186,20 +186,6 @@ custom_derive! {
         Gist(GistError),
     }
 }
-impl PartialEq for ArgsError {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            // We have to write this branch (and the whole PartialEq implementation)
-            // because clap::Error doesn't have its own PartialEq.
-            // TODO: make a PR to clap to fix this.
-            (&ArgsError::Parse(ref e1), &ArgsError::Parse(ref e2)) => {
-                e1.message == e2.message && e1.kind == e2.kind && e1.info == e2.info
-            },
-            (&ArgsError::Gist(ref g1), &ArgsError::Gist(ref g2)) => g1 == g2,
-            _ => false,
-        }
-    }
-}
 
 
 /// Type holding the value of the GIST argument.
