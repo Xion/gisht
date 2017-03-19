@@ -1,5 +1,6 @@
 //! Module extending the capabilities of the Hyper library.
 
+#[allow(dead_code)]
 pub mod header {
     //! Additional HTTP headers for use with Hyper.
 
@@ -55,8 +56,6 @@ pub mod header {
                 .compile().unwrap();
             }
 
-            // Note that in case of multiple Link: values with the same rel=,
-            // the last one counts, overwriting all the previous ones.
             let mut links = HashMap::new();
             for value in raw {
                 let value = try!(from_utf8(value).map_err(|_| hyper::Error::Header));
