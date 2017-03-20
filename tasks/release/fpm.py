@@ -5,6 +5,7 @@ This essentially a wrapper script around fpm (https://github.com/jordansissel/fp
 Requires fpm to be installed first, which may in turn require Ruby with C headers.
 Refer to fpm's README for installation instructions.
 """
+import collections
 import gzip
 from itertools import starmap
 import logging
@@ -24,20 +25,6 @@ import toml
 from tasks import BIN
 from tasks.release import RELEASE_DIR
 
-
-# Package information.
-#
-# Fields that map to tuples are retrieved from the corresponding field path
-# in Cargo.toml (and optionally undergo transformations through functions).
-PACKAGE_INFO = dict(
-    name=('package', 'name'),
-    version=('package', 'version'),
-    description=('package', 'description'),
-    url=('package', 'homepage'),
-    license=('package', 'license'),
-    maintainer=('package', 'authors', 0,
-                lambda v: v[:v.find('<') - 1] if '<' in v else v),
-)
 
 SOURCE_DIR = Path.cwd() / 'target' / 'release'
 OUTPUT_DIR = RELEASE_DIR
@@ -78,8 +65,8 @@ def tar_gz(ctx):
 
     # Compress that file with gzip.
     tar_gz_path = str(OUTPUT_DIR / ('%s.tar.gz' % bundler.bundle_name))
-    with open(tar_path, 'rb') as tar_f, \
-        gzip.open(tar_gz_path, 'wb') as tar_gz_f:
+    with open(tar_path, 'rb') as tar_f:
+        with gzip.open(tar_gz_path, 'wb') as tar_gz_f:
             shutil.copyfileobj(tar_f, tar_gz_f)
 
     logging.debug("Compressed release tarball created.")
@@ -183,7 +170,7 @@ class Bundler(object):
         except KeyError:
             self._arch = self._get_architecture()
 
-        self._package = self._read_package_info()
+        self._package = PackageInfo()
 
     def _get_architecture(self):
         """Build an string describing architecture of the current system.
@@ -203,36 +190,11 @@ class Bundler(object):
         hardware_name = uname_hardware.stdout.strip()  # e.g. 'x86_64'
         return '%s-%s' % (hardware_name, os_name)
 
-    def _read_package_info(self, cargo_toml=None):
-        """Read package info from the [package] section of Cargo.toml.
-
-        :return: Dictionary mapping PACKAGE_FIELDS to their values
-        """
-        cargo_toml = Path(cargo_toml or Path.cwd() / 'Cargo.toml')
-        with cargo_toml.open() as f:
-            manifest = toml.load(f)
-
-        # PACKAGE_INFO defines how to obtain package info from Cargo.toml
-        # by providing either a tuple of subsequent keys to follow / transformations
-        # to apply; or a verbatim value.
-        result = {}
-        for field, spec in PACKAGE_INFO.items():
-            if isinstance(spec, tuple):
-                value = manifest
-                for step in spec:
-                    value = step(value) if callable(step) else value[step]
-            else:
-                value = spec
-            if value is not None:
-                result[field] = value
-
-        return result
-
     @property
     def bundle_name(self):
         """Name of the release bundle. This is used as a filename."""
         return '%s-%s-%s' % (
-            self._package['name'], self._package['version'], self._arch)
+            self._package.name, self._package.version, self._arch)
 
     def build(self, **flags):
         """Call fpm to create the release bundle.
@@ -288,6 +250,80 @@ class Bundler(object):
     def _which(self, prog):
         """Check if given program is available."""
         return which(self._ctx, prog)
+
+
+class PackageInfo(collections.Mapping):
+    """Information about a Rust package, as read from its Cargo.toml."""
+
+    # Package fields dictionary,
+    # specifying how they are retrieved from Cargo.toml.
+    #
+    # Fields that map to tuples are retrieved from the corresponding field path
+    # in Cargo.toml (and optionally undergo transformations through functions).
+    FIELDS = dict(
+        name=('package', 'name'),
+        version=('package', 'version'),
+        description=('package', 'description'),
+        url=('package', 'homepage'),
+        license=('package', 'license'),
+        maintainer=('package', 'authors', 0,
+                    lambda v: v[:v.find('<') - 1] if '<' in v else v),
+    )
+
+    def __init__(self, cargo_toml=None):
+        """Constructor.
+
+        :param cargo_toml: Path to Cargo.toml of the package.
+                           By default, it will be the Cargo.toml in the
+                           current directory.
+        """
+        cargo_toml = Path(cargo_toml or Path.cwd() / 'Cargo.toml')
+        self._cargo_toml = cargo_toml
+
+        with cargo_toml.open() as f:
+           self._manifest = toml.load(f)
+
+    def _get_field_value(self, field):
+        """Retrieve a value of the field from Cargo.toml package manifest."""
+        try:
+            spec = self.FIELDS[field]
+        except KeyError:
+            raise ValueError(field)
+
+        # If the spec is a tuple, go down the TOML path, potentially applying
+        # some tranformations along the way.
+        if isinstance(spec, tuple):
+            value = self._manifest
+            for step in spec:
+                value = step(value) if callable(step) else value[step]
+        else:
+            value = spec
+
+        # Cache the value on the object for subsequent retrieval.
+        setattr(self, field, value)
+        return value
+
+    def __getitem__(self, key):
+        """collections.Mapping interface."""
+        try:
+            return self._get_field_value(key)
+        except ValueError:
+            raise KeyError(key)
+
+    def __iter__(self):
+        """collections.Mapping interface."""
+        return (k for k in self.FIELDS.keys())
+
+    def __len__(self):
+        """collections.Mapping interface."""
+        return len(self.FIELDS)
+
+    def __getattr__(self, field):
+        """Convenience interface for getting package fields as attributes."""
+        try:
+            return self._get_field_value(field)
+        except ValueError:
+            raise AttributeError(field)
 
 
 # Utility functions
