@@ -3,6 +3,7 @@
 use std::io;
 
 use regex::Regex;
+use url::Url;
 
 use gist::{self, Gist};
 use hosts::common::Basic;
@@ -21,20 +22,18 @@ pub struct Hastebin {
 impl Hastebin {
     #[inline]
     pub fn new() -> Self {
-        // TODO: In reality, the URLs seem to include a completely optional "extension",
+        // Hastebin URLs include a completely optional "extension",
         // so the actual URLs can be something like http://hastebin.com/geuyfgdf.foo,
         // where ".foo" is optional indicator of the syntax highlighting
         // to use when displaying the gist in the browser.
         //
-        // To support that, we may need to wrap Basic in a new type.
-        // For maximum functionality, we'd also have to recreate the original "extension",
-        // so that the syntax highlighting can be applied to a website opened via
-        // `gisht show hb:ahgfuehg.foo`.
+        // To support this, we need to wrap Basic in a new type and ensure that:
         //
-        // Alternatively, just store the extension as part of the gist ID.
-        // The downside is potentially having multiple copies of the same gist,
-        // under abcdef.foo and abcdef.bar.
-
+        // * the extension is stripped when resolving a Hastebin URL
+        // * it is added back when the URL is rebuilt
+        //   (so that the syntax highlighting can be applied to a website
+        //    opened via `gisht show hb:ahgfuehg.foo`).
+        //
         let inner = Basic::new(ID, "hastebin.com",
                                "https://hastebin.com/raw/${id}",
                                "https://hastebin.com/${id}",
@@ -51,16 +50,52 @@ impl Host for Hastebin {
         self.inner.fetch_gist(gist, mode)
     }
 
+    /// Return the URL to given hastebin.com gist.
     fn gist_url(&self, gist: &Gist) -> io::Result<String> {
-        self.inner.gist_url(gist)
+        let mut url = try!(self.inner.gist_url(gist));
+
+        // Replace the "stripped" (extension-less) gist ID in the URL
+        // with the "full" one that's been saved on gist info by resolve_url().
+        if let Some(ref full_id) = gist.info(gist::Datum::Id) {
+            let mut url_obj = Url::parse(&url).unwrap();
+            url_obj.path_segments_mut().unwrap().pop().push(full_id);
+            url = url_obj.to_string()
+        }
+        Ok(url)
     }
 
     fn gist_info(&self, gist: &Gist) -> io::Result<Option<gist::Info>> {
         self.inner.gist_info(gist)
     }
 
-    fn resolve_url(&self, url: &str) -> Option<io::Result<Gist>> {
-        self.inner.resolve_url(url)
+    /// Resolve given URL as potentially pointing to a hastebin.com gist.
+    fn resolve_url(&self, mut url: &str) -> Option<io::Result<Gist>> {
+        let url_obj = try_opt!(Url::parse(url).ok());
+
+        // Remove the optional "extension" from the given URL,
+        // turning http://hastebin.com/qwerty.foo into http://hastebin/qwerty.
+        // Preserve it for later inclusion in the gist info.
+        let mut extension: Option<&str> = None;  // incl. the dot
+        let last_path_segment = try_opt!(url_obj.path_segments().and_then(|ps| ps.last()));
+        if let Some(dot_idx) = last_path_segment.rfind(".") {
+            let ext = &last_path_segment[dot_idx..];
+            extension = Some(ext);
+            url = url.trim_right_matches(ext);
+        }
+
+        // Resolve the URL using the Basic method and include the ID in gist info.
+        let mut gist = match self.inner.resolve_url(url) {
+            Some(Ok(gist)) => gist,
+            other => return other,
+        };
+        if let Some(ext) = extension {
+            let full_id = format!("{}{}", gist.id.as_ref().unwrap(), ext);
+            let info_builder = gist.info.clone()
+                .map(|i| i.to_builder()).unwrap_or_else(gist::InfoBuilder::new);
+            gist.info = Some(info_builder.with(gist::Datum::Id, &full_id).build());
+        }
+
+        Some(Ok(gist))
     }
 }
 

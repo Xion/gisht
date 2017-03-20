@@ -78,6 +78,11 @@ impl Info {
             None => Cow::Owned(datum.default_value().to_owned()),
         }
     }
+
+    #[inline]
+    pub fn to_builder(self) -> InfoBuilder {
+        InfoBuilder{data: self.data}
+    }
 }
 
 impl fmt::Display for Info {
