@@ -90,9 +90,9 @@ impl Default for FetchMode {
 }
 
 
+/// Mapping of gist host identifiers to Host structs.
 lazy_static! {
-    /// Mapping of gist host identifiers to Host structs.
-    pub static ref HOSTS: HashMap<&'static str, Arc<Host>> = hashmap!{
+    static ref BUILTIN_HOSTS: HashMap<&'static str, Arc<Host>> = hashmap!{
         github::ID => Arc::new(github::GitHub::new()) as Arc<Host>,
         pastebin::ID => Arc::new(pastebin::create()) as Arc<Host>,
         lpaste::ID => Arc::new(lpaste::create()) as Arc<Host>,
@@ -101,6 +101,19 @@ lazy_static! {
         mozilla::ID => Arc::new(mozilla::create()) as Arc<Host>,
         paste::ID => Arc::new(paste::create()) as Arc<Host>,
         hastebin::ID => Arc::new(hastebin::Hastebin::new()) as Arc<Host>,
+    };
+}
+#[cfg(not(test))]
+lazy_static! {
+    pub static ref HOSTS: HashMap<&'static str, Arc<Host>> = BUILTIN_HOSTS.clone();
+}
+#[cfg(test)]
+lazy_static! {
+    pub static ref HOSTS: HashMap<&'static str, Arc<Host>> = {
+        use util::testing::{IN_MEMORY_HOST_ID, InMemoryHost};
+        let mut hosts = BUILTIN_HOSTS.clone();
+        hosts.insert(IN_MEMORY_HOST_ID, Arc::new(InMemoryHost::new()) as Arc<Host>);
+        hosts
     };
 }
 

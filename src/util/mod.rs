@@ -1,5 +1,9 @@
 //! Utility module.
 
+#[cfg(test)]
+pub mod testing;
+
+
 use std::fs;
 use std::io;
 use std::path::Path;
