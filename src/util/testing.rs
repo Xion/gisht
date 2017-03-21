@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::io;
+use std::sync::RwLock;
 
 use regex::Regex;
 
@@ -10,7 +11,6 @@ use hosts::{FetchMode, Host};
 
 
 pub const IN_MEMORY_HOST_ID: &'static str = "mem";
-
 
 /// Fake implementation of a gist Host that stores gists in memory.
 ///
@@ -21,12 +21,14 @@ pub const IN_MEMORY_HOST_ID: &'static str = "mem";
 /// * HTML URL format:: memory://html/id/$ID or memory://html/uri/$OWNER/$NAME
 ///
 pub struct InMemoryHost {
-    gists: HashMap<gist::Uri, Gist>,
+    gists: RwLock<HashMap<gist::Uri, Gist>>,
 }
 
 impl InMemoryHost {
     pub fn new() -> Self {
-        InMemoryHost{gists: HashMap::new()}
+        InMemoryHost{
+            gists: RwLock::new(HashMap::new())
+        }
     }
 }
 
@@ -63,8 +65,8 @@ impl Host for InMemoryHost {
         if let Some(caps) = HTML_URL_FOR_ID_RE.captures(url) {
             debug!("URL {} points to an in-memory gist by ID", url);
             let id = caps.name("id").unwrap();
-            return self.gists.iter()
-                .find(|&(_, g)| g.id.as_ref().map(|gid| gid == id).unwrap_or(false))  // WTF RUST
+            return self.gists.read().unwrap().iter()
+                .find(|&(_, g)| g.id.as_ref().map(String::as_str) == Some(id))
                 .map(|(_, g)| g.clone()).map(Ok);
         }
 
@@ -74,7 +76,7 @@ impl Host for InMemoryHost {
             let owner = caps.name("owner").unwrap();
             let name = caps.name("name").unwrap();
             let uri = gist::Uri::new(IN_MEMORY_HOST_ID, owner, name).unwrap();
-            return self.gists.get(&uri).map(|g| Ok(g.clone()));
+            return self.gists.read().unwrap().get(&uri).map(|g| Ok(g.clone()));
         }
 
         debug!("URL {} doesn't point to an in-memory gist", url);
@@ -82,6 +84,51 @@ impl Host for InMemoryHost {
     }
 }
 
+// Public interface of the in-memory gist host.
+#[allow(dead_code)]
 impl InMemoryHost {
-    // TODO: methods to fill in the gist collection for testing
+    /// Remove all stored in-memory gists.
+    /// Call this at the beginning of a test.
+    pub fn reset(&self) {
+        let mut gists = self.gists.write().unwrap();
+        gists.clear();
+    }
+
+    /// Put a gist into the collection of in-memory gists.
+    pub fn put_gist(&self, gist: Gist) {
+        let mut gists = self.gists.write().unwrap();
+
+        let id = gist.id.clone();
+        let stored = gists.entry(gist.uri.clone()).or_insert(gist);
+        if stored.id != id {
+            panic!("Tried to add duplicate gist with URI {} and ID={:?},
+                which is different than existing ID={:?}", stored.uri, id, stored.id);
+        }
+    }
+
+    /// Remove the gist from in-memory collection.
+    /// Returns true if it was actually removed, false if it wasn't there.
+    pub fn remove_gist(&self, uri: gist::Uri) -> bool {
+        let mut gists = self.gists.write().unwrap();
+        gists.remove(&uri).is_some()
+    }
+
+    /// Check if the in-memory collection has a gist with given ID.
+    /// This is O(n) wrt to the number of stored gists.
+    pub fn has_gist_for_id(&self, id: &str) -> bool {
+        self.gists.read().unwrap().iter()
+            .find(|&(_, g)| g.id.as_ref().map(String::as_str) == Some(id))
+            .is_some()
+    }
+
+    /// Check if the in-memory collection contains a gist for given URI.
+    pub fn has_gist_for_uri(&self, uri: gist::Uri) -> bool {
+        self.gists.read().unwrap().contains_key(&uri)
+    }
+
+    /// Returns the number of stored gists.
+    pub fn count(&self) -> usize {
+        self.gists.read().unwrap().len()
+    }
 }
+
