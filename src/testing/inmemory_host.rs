@@ -1,4 +1,4 @@
-//! Testing utilities.
+//! Module implementing in-memory Host (a fake Host implementation for testing).
 
 #![allow(dead_code)]
 
@@ -9,6 +9,9 @@ use gist::{self, Gist};
 use hosts::{FetchMode, Host};
 
 
+pub const INMEMORY_HOST_DEFAULT_ID: &'static str = "mem";
+
+
 /// Gist stored (or not) in the in-memory host.
 struct StoredGist {
     gist: Option<Gist>,
@@ -17,7 +20,7 @@ struct StoredGist {
 
 impl StoredGist {
     pub fn new(gist: Gist, url: String) -> Self {
-        StoredGist {gist: Some(gist), url: Some(url)}
+        StoredGist{gist: Some(gist), url: Some(url)}
     }
 }
 impl From<Gist> for StoredGist {
@@ -43,8 +46,6 @@ impl StoredGist {
 }
 
 
-pub const DEFAULT_IN_MEMORY_HOST_ID: &'static str = "mem";
-
 /// Fake implementation of a gist Host that stores gists in memory.
 ///
 /// While it doesn't perform any disk or network I/O, it uses the following formats
@@ -55,7 +56,7 @@ pub const DEFAULT_IN_MEMORY_HOST_ID: &'static str = "mem";
 ///
 pub struct InMemoryHost {
     id: &'static str,
-    gists: RwLock<Vec<StoredGist>>,
+    gists: RwLock<Vec<StoredGist>>,  // lock due to Host: Sync requirement
 }
 
 impl InMemoryHost {
@@ -66,7 +67,7 @@ impl InMemoryHost {
     /// Do not call this method in tests!
     /// The "mem" in-memory host is always accessible for crate-level and unit tests.
     pub fn new() -> Self {
-        Self::with_id(DEFAULT_IN_MEMORY_HOST_ID)
+        Self::with_id(INMEMORY_HOST_DEFAULT_ID)
     }
 
     /// Create an instance of in-memory host with given ID.

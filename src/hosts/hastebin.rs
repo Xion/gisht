@@ -110,7 +110,7 @@ mod internal {
 mod tests {
     use gist::{self, Gist};
     use hosts::Host;
-    use util::testing::InMemoryHost;
+    use testing::InMemoryHost;
     use super::{ID, Hastebin, internal};
 
     #[test]

@@ -42,6 +42,9 @@ mod gist;
 mod hosts;
 mod logging;
 
+#[cfg(test)]
+mod testing;
+
 
 use std::env;
 use std::error::Error;

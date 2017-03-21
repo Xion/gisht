@@ -110,9 +110,9 @@ lazy_static! {
 #[cfg(test)]
 lazy_static! {
     pub static ref HOSTS: HashMap<&'static str, Arc<Host>> = {
-        use util::testing::{DEFAULT_IN_MEMORY_HOST_ID, InMemoryHost};
+        use testing::{INMEMORY_HOST_DEFAULT_ID, InMemoryHost};
         let mut hosts = BUILTIN_HOSTS.clone();
-        hosts.insert(DEFAULT_IN_MEMORY_HOST_ID, Arc::new(InMemoryHost::new()) as Arc<Host>);
+        hosts.insert(INMEMORY_HOST_DEFAULT_ID, Arc::new(InMemoryHost::new()) as Arc<Host>);
         hosts
     };
 }
@@ -122,6 +122,7 @@ pub const DEFAULT_HOST_ID: &'static str = github::ID;
 
 #[cfg(test)]
 mod tests {
+    use testing::INMEMORY_HOST_DEFAULT_ID;
     use super::{DEFAULT_HOST_ID, HOSTS};
 
     #[test]
@@ -135,5 +136,11 @@ mod tests {
     fn default_host_id() {
         assert!(HOSTS.contains_key(DEFAULT_HOST_ID),
             "Default host ID `{}` doesn't occur among known gist hosts", DEFAULT_HOST_ID);
+    }
+
+    #[test]
+    fn inmemory_host_for_testing() {
+        assert!(HOSTS.contains_key(INMEMORY_HOST_DEFAULT_ID),
+            "Test in-memory host ID `{}` doesn't occur among known gist hosts", INMEMORY_HOST_DEFAULT_ID);
     }
 }
