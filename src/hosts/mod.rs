@@ -110,9 +110,9 @@ lazy_static! {
 #[cfg(test)]
 lazy_static! {
     pub static ref HOSTS: HashMap<&'static str, Arc<Host>> = {
-        use util::testing::{IN_MEMORY_HOST_ID, InMemoryHost};
+        use util::testing::{DEFAULT_IN_MEMORY_HOST_ID, InMemoryHost};
         let mut hosts = BUILTIN_HOSTS.clone();
-        hosts.insert(IN_MEMORY_HOST_ID, Arc::new(InMemoryHost::new()) as Arc<Host>);
+        hosts.insert(DEFAULT_IN_MEMORY_HOST_ID, Arc::new(InMemoryHost::new()) as Arc<Host>);
         hosts
     };
 }

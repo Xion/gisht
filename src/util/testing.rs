@@ -1,16 +1,49 @@
 //! Testing utilities.
 
-use std::collections::HashMap;
+#![allow(dead_code)]
+
 use std::io;
 use std::sync::RwLock;
-
-use regex::Regex;
 
 use gist::{self, Gist};
 use hosts::{FetchMode, Host};
 
 
-pub const IN_MEMORY_HOST_ID: &'static str = "mem";
+/// Gist stored (or not) in the in-memory host.
+struct StoredGist {
+    gist: Option<Gist>,
+    url: Option<String>,
+}
+
+impl StoredGist {
+    pub fn new(gist: Gist, url: String) -> Self {
+        StoredGist {gist: Some(gist), url: Some(url)}
+    }
+}
+impl From<Gist> for StoredGist {
+    fn from(gist: Gist) -> Self {
+        StoredGist{gist: Some(gist), url: None}
+    }
+}
+
+impl StoredGist {
+    pub fn is_available(&self) -> bool {
+        self.gist.is_some()
+    }
+
+    pub fn id(&self) -> Option<&str> {
+        let gist = try_opt!(self.gist.as_ref());
+        let id = try_opt!(gist.id.as_ref());
+        Some(id.as_str())
+    }
+
+    pub fn uri(&self) -> Option<&gist::Uri> {
+        self.gist.as_ref().map(|g| &g.uri)
+    }
+}
+
+
+pub const DEFAULT_IN_MEMORY_HOST_ID: &'static str = "mem";
 
 /// Fake implementation of a gist Host that stores gists in memory.
 ///
@@ -21,31 +54,51 @@ pub const IN_MEMORY_HOST_ID: &'static str = "mem";
 /// * HTML URL format:: memory://html/id/$ID or memory://html/uri/$OWNER/$NAME
 ///
 pub struct InMemoryHost {
-    gists: RwLock<HashMap<gist::Uri, Gist>>,
+    id: &'static str,
+    gists: RwLock<Vec<StoredGist>>,
 }
 
 impl InMemoryHost {
+    /// Create a default instance of in-memory host, to be accessible as standalone host.
+    ///
+    /// ## Warning
+    ///
+    /// Do not call this method in tests!
+    /// The "mem" in-memory host is always accessible for crate-level and unit tests.
     pub fn new() -> Self {
+        Self::with_id(DEFAULT_IN_MEMORY_HOST_ID)
+    }
+
+    /// Create an instance of in-memory host with given ID.
+    pub fn with_id(id: &'static str) -> Self {
         InMemoryHost{
-            gists: RwLock::new(HashMap::new())
+            id: id,
+            gists: RwLock::new(Vec::new())
         }
     }
 }
 
 impl Host for InMemoryHost {
-    fn id(&self) -> &'static str { IN_MEMORY_HOST_ID }
+    fn id(&self) -> &'static str { self.id }
     fn name(&self) -> &str { "(memory)" }
 
-    fn fetch_gist(&self, _: &Gist, _: FetchMode) -> io::Result<()> {
-        // TODO: allow some gists to fail to be "downloaded"
+    fn fetch_gist(&self, gist: &Gist, _: FetchMode) -> io::Result<()> {
+        let gists = self.gists.read().unwrap();
+        if gists.iter().find(|sg| sg.gist.as_ref() == Some(gist)).is_none() {
+            return Err(io::Error::new(io::ErrorKind::NotFound,
+                format!("Cannot find {:?}", gist)));
+        }
         Ok(())
     }
 
     fn gist_url(&self, gist: &Gist) -> io::Result<String> {
-        Ok(format!("memory://html/{}", match gist.id {
-            Some(ref id) => format!("id/{}", id),
-            None => format!("uri/{}", gist.uri),
-        }))
+        let gists = self.gists.read().unwrap();
+        if let Some(stored_gist) = gists.iter().find(|sg| sg.gist.as_ref() == Some(gist)) {
+            return stored_gist.url.clone()
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData,
+                    format!("{:?} doesn't have a URL associated with it", gist)));
+        }
+        Err(io::Error::new(io::ErrorKind::NotFound, format!("Cannot find {:?}", gist)))
     }
 
     fn gist_info(&self, _: &Gist) -> io::Result<Option<gist::Info>> {
@@ -54,38 +107,20 @@ impl Host for InMemoryHost {
     }
 
     fn resolve_url(&self, url: &str) -> Option<io::Result<Gist>> {
-        lazy_static! {
-            static ref HTML_URL_FOR_ID_RE: Regex = Regex::new(
-                r#"memory://html/id/(?P<id>.+)"#).unwrap();
-            static ref HTML_URL_FOR_URI_RE: Regex = Regex::new(
-                r#"memory://html/uri/(?P<owner>[^/])/(?P<name>.+)"#).unwrap();
-        }
-
-        // Try to find a gist by ID. For that, we need to iterate over all gists.
-        if let Some(caps) = HTML_URL_FOR_ID_RE.captures(url) {
-            debug!("URL {} points to an in-memory gist by ID", url);
-            let id = caps.name("id").unwrap();
-            return self.gists.read().unwrap().iter()
-                .find(|&(_, g)| g.id.as_ref().map(String::as_str) == Some(id))
-                .map(|(_, g)| g.clone()).map(Ok);
-        }
-
-        // Alternatively, find it directly by the gist URI.
-        if let Some(caps) = HTML_URL_FOR_URI_RE.captures(url) {
-            debug!("URL {} points to an in-memory gist by its URI", url);
-            let owner = caps.name("owner").unwrap();
-            let name = caps.name("name").unwrap();
-            let uri = gist::Uri::new(IN_MEMORY_HOST_ID, owner, name).unwrap();
-            return self.gists.read().unwrap().get(&uri).map(|g| Ok(g.clone()));
-        }
-
-        debug!("URL {} doesn't point to an in-memory gist", url);
-        None
+        let gists = self.gists.read().unwrap();
+        let stored_gist = try_opt!(gists.iter()
+            .find(|sg| sg.url.as_ref().map(String::as_str) == Some(url)));
+        let result = match stored_gist.gist {
+            Some(ref gist) => Ok(gist.clone()),
+            None => Err(io::Error::new(io::ErrorKind::NotFound,
+                format!("URL {} doesn't point to an available gist", url))),
+        };
+        Some(result)
     }
 }
 
 // Public interface of the in-memory gist host.
-#[allow(dead_code)]
+// Note that most operations are O(n) wrt to the number of gists stored.
 impl InMemoryHost {
     /// Remove all stored in-memory gists.
     /// Call this at the beginning of a test.
@@ -94,36 +129,49 @@ impl InMemoryHost {
         gists.clear();
     }
 
-    /// Put a gist into the collection of in-memory gists.
+    /// Put a gist into the collection of in-memory gists, without an associated URL.
     pub fn put_gist(&self, gist: Gist) {
         let mut gists = self.gists.write().unwrap();
-
-        let id = gist.id.clone();
-        let stored = gists.entry(gist.uri.clone()).or_insert(gist);
-        if stored.id != id {
-            panic!("Tried to add duplicate gist with URI {} and ID={:?},
-                which is different than existing ID={:?}", stored.uri, id, stored.id);
+        if gists.iter().find(|sg| sg.gist.as_ref() == Some(&gist)).is_some() {
+            panic!("Tried to put duplicate gist {:?}", gist);
         }
+        gists.push(StoredGist::from(gist));
+    }
+
+    /// Put a gist into the collection of in-memory gists with an associated URL.
+    pub fn put_gist_with_url<U: ToString>(&self, gist: Gist, url: U) {
+        let url = url.to_string();
+        let mut gists = self.gists.write().unwrap();
+        if gists.iter().find(|sg| sg.url.as_ref() == Some(&url)).is_some() {
+            panic!("Tried to put gist {:?} under a duplicate URL: {}", gist, url);
+        }
+        gists.push(StoredGist::new(gist, url));
     }
 
     /// Remove the gist from in-memory collection.
     /// Returns true if it was actually removed, false if it wasn't there.
-    pub fn remove_gist(&self, uri: gist::Uri) -> bool {
+    pub fn remove_gist_by_uri(&self, uri: &gist::Uri) -> bool {
         let mut gists = self.gists.write().unwrap();
-        gists.remove(&uri).is_some()
+        let maybe_idx = gists.iter().position(|sg| sg.uri() == Some(&uri));
+        match maybe_idx {
+            Some(idx) => { gists.remove(idx); true },
+            None => false,
+        }
     }
 
     /// Check if the in-memory collection has a gist with given ID.
     /// This is O(n) wrt to the number of stored gists.
     pub fn has_gist_for_id(&self, id: &str) -> bool {
         self.gists.read().unwrap().iter()
-            .find(|&(_, g)| g.id.as_ref().map(String::as_str) == Some(id))
+            .find(|sg| sg.id() == Some(id))
             .is_some()
     }
 
     /// Check if the in-memory collection contains a gist for given URI.
-    pub fn has_gist_for_uri(&self, uri: gist::Uri) -> bool {
-        self.gists.read().unwrap().contains_key(&uri)
+    pub fn has_gist_for_uri(&self, uri: &gist::Uri) -> bool {
+        self.gists.read().unwrap().iter()
+            .find(|sg| sg.uri() == Some(uri))
+            .is_some()
     }
 
     /// Returns the number of stored gists.
@@ -131,4 +179,3 @@ impl InMemoryHost {
         self.gists.read().unwrap().len()
     }
 }
-
