@@ -166,6 +166,19 @@ mod tests {
 
     #[test]
     fn gist_url_includes_extension() {
-        // TODO: write this test
+        let host = internal::Hastebin{inner: InMemoryHost::with_id(ID)};
+
+        // Add the gist with the full ID saved on gist metadata.
+        let gist_id = "foo";
+        let full_gist_id = "foo.bash";
+        let gist = Gist::new(gist::Uri::from_name(ID, gist_id).unwrap(), gist_id)
+            .with_info(gist::InfoBuilder::new()
+                .with(gist::Datum::Id, full_gist_id)
+                .build());
+        host.inner.put_gist_with_url(gist.clone(), format!("https://hastebin.com/{}", gist_id));
+
+        // Gist URL should include the extension.
+        let url = host.gist_url(&gist).unwrap();
+        assert_eq!(format!("https://hastebin.com/{}", full_gist_id), url);
     }
 }
