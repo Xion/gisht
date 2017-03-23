@@ -51,9 +51,10 @@ pub trait Host : Send + Sync {
     /// rather than Option<io::Result<Info>> because the availability of
     /// gist metadata may be gist-specific (i.e. some gists have it,
     /// some don't).
-    fn gist_info(&self, _: &Gist) -> io::Result<Option<gist::Info>> {
-        // This default indicates the host doesn't expose any gist metadata.
-        Ok(None)
+    fn gist_info(&self, gist: &Gist) -> io::Result<Option<gist::Info>> {
+        // This default indicates the host cannot fetch any additional gist metadata
+        // (beyond what may already have been fetched when resolving gist URL).
+        Ok(gist.info.clone())
     }
 
     /// Return a gist corresponding to the given URL.

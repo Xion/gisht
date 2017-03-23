@@ -19,7 +19,7 @@ impl Hastebin {
         // where ".foo" is optional indicator of the syntax highlighting
         // to use when displaying the gist in the browser.
         //
-        // To support this, we need to wrap Basic in a new type and ensure that:
+        // To support this, we're wrapping wrap Basic in a new type and ensure that:
         //
         // * the extension is stripped when resolving a Hastebin URL
         // * it is added back when the URL is rebuilt
@@ -64,13 +64,25 @@ mod internal {
             if let Some(ref full_id) = gist.info(gist::Datum::Id) {
                 let mut url_obj = Url::parse(&url).unwrap();
                 url_obj.path_segments_mut().unwrap().pop().push(full_id);
-                url = url_obj.to_string()
+                url = url_obj.to_string();
             }
             Ok(url)
         }
 
         fn gist_info(&self, gist: &Gist) -> io::Result<Option<gist::Info>> {
-            self.inner.gist_info(gist)
+            let mut info = try!(self.inner.gist_info(gist))
+                .unwrap_or_else(|| gist::InfoBuilder::new().build());
+
+            // Deduce the gist language from its extension.
+            if let Some(ref full_id) = gist.info(gist::Datum::Id) {
+                let extension = full_id.rsplit(".").next().unwrap_or_else(|| {
+                    // This could only happen if resolve_url() has put some nonsense in Datum::Id.
+                    panic!("Invalid format of Hastebin's gist full ID: {}", full_id);
+                });
+                // TODO: map the extension to a more user-friendly language name
+                info = info.to_builder().with(gist::Datum::Language, extension).build();
+            }
+            Ok(Some(info))
         }
 
         /// Resolve given URL as potentially pointing to a hastebin.com gist.
@@ -180,5 +192,24 @@ mod tests {
         // Gist URL should include the extension.
         let url = host.gist_url(&gist).unwrap();
         assert_eq!(format!("https://hastebin.com/{}", full_gist_id), url);
+    }
+
+    #[test]
+    fn gist_info_includes_language() {
+        let host = internal::Hastebin{inner: InMemoryHost::with_id(ID)};
+
+        // Add the gist with the full ID saved on gist metadata.
+        let gist_id = "foo";
+        let full_gist_id = "foo.bash";
+        let gist = Gist::new(gist::Uri::from_name(ID, gist_id).unwrap(), gist_id)
+            .with_info(gist::InfoBuilder::new()
+                .with(gist::Datum::Id, full_gist_id)
+                .build());
+        host.inner.put_gist_with_url(gist.clone(), format!("https://hastebin.com/{}", gist_id));
+
+        // Gist info should include language deduced from the extension.
+        let info = host.gist_info(&gist).unwrap().unwrap();
+        assert!(info.has(gist::Datum::Language), "Gist info doesn't include Language");
+        assert_eq!("bash", &*info.get(gist::Datum::Language));
     }
 }

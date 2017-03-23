@@ -5,7 +5,7 @@ use std::io;
 use std::path::Path;
 
 
-/// Like try!(), but the return Some(Err(err)) in case of error.
+/// Like try!(), but returns Some(Err(err)) in case of error.
 /// Compatible with functions returning Option<Result<T, E>>.
 macro_rules! try_some {
     ($ex:expr) => (match $ex {

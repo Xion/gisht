@@ -102,11 +102,6 @@ impl Host for InMemoryHost {
         Err(io::Error::new(io::ErrorKind::NotFound, format!("Cannot find {:?}", gist)))
     }
 
-    fn gist_info(&self, _: &Gist) -> io::Result<Option<gist::Info>> {
-        // This default indicates the host doesn't expose any gist metadata.
-        Ok(None)
-    }
-
     fn resolve_url(&self, url: &str) -> Option<io::Result<Gist>> {
         let gists = self.gists.read().unwrap();
         let stored_gist = try_opt!(gists.iter()

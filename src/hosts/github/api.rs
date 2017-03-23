@@ -213,6 +213,12 @@ pub fn build_gist_info(info: &Json, data: &[Datum]) -> gist::Info {
             // Special-cased data that are more complicated to get.
             match datum {
                 Datum::Owner => { result.set(datum, gist_owner_from_info(&info)); },
+                Datum::Language => {
+                    match gist_language_from_info(&info) {
+                        Some(lang) => { result.set(datum, lang); },
+                        None => { trace!("Couldn't retrieve the language of GitHub gist"); },
+                    }
+                },
                 _ => { panic!("Unexpected gist info data piece: {:?}", datum); },
             }
         }
@@ -242,6 +248,13 @@ pub fn gist_name_from_info(info: &Json) -> Option<&str> {
 /// This may be an anonymous name.
 pub fn gist_owner_from_info(info: &Json) -> &str {
     info.find_path(&["owner", "login"]).and_then(Json::as_str).unwrap_or(ANONYMOUS)
+}
+
+/// Retrieve gist language, if known, from the parsed JSON of gist info.
+pub fn gist_language_from_info(info: &Json) -> Option<&str> {
+    let filename = try_opt!(gist_name_from_info(info));
+    let language = try_opt!(info.find_path(&["files", filename, "language"]));
+    language.as_str().map(|s| s as &str)
 }
 
 

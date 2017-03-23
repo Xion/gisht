@@ -44,6 +44,9 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
             if let Some(interpreter) = guess_interpreter(&binary) {
                 error = interpreted_run(interpreter, &binary, args);
             } else {
+                // TODO: use other signals to infer the interpreter:
+                // * gist_info/Language
+                // * hashang
                 error!("Failed to guess an interpreter for gist {}", uri);
             }
         }

@@ -20,6 +20,8 @@ custom_derive! {
         /// The meaning of this URL is host-specific, but it's typically
         /// either a text/plain gist code, or a repository URL.
         RawUrl,
+        /// Programming language the gist is written in.
+        Language,
         /// Description of the gist, typically provided by the owner upon creation.
         Description,
         /// Date/time the gist was created.
@@ -33,6 +35,7 @@ impl Datum {
         match *self {
             Datum::Id |
             Datum::Owner |
+            Datum::Language |
             Datum::CreatedAt |
             Datum::UpdatedAt => "(unknown)",
             Datum::BrowserUrl | Datum::RawUrl => "N/A",
@@ -47,6 +50,7 @@ impl fmt::Display for Datum {
             Datum::Owner => "Owner",
             Datum::BrowserUrl => "URL",
             Datum::RawUrl => "URL (raw)",
+            Datum::Language => "Language",
             Datum::Description => "Description",
             Datum::CreatedAt => "Created at",
             Datum::UpdatedAt => "Last update",
