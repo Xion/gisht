@@ -1,6 +1,7 @@
-//! MOdule for interacting with GitHub API.
+//! Module for interacting with GitHub API.
 
-use std::collections::HashMap;
+use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
 use std::io;
 
 use hyper;
@@ -215,7 +216,7 @@ pub fn build_gist_info(info: &Json, data: &[Datum]) -> gist::Info {
                 Datum::Owner => { result.set(datum, gist_owner_from_info(&info)); },
                 Datum::Language => {
                     match gist_language_from_info(&info) {
-                        Some(lang) => { result.set(datum, lang); },
+                        Some(lang) => { result.set(datum, &*lang); },
                         None => { trace!("Couldn't retrieve the language of GitHub gist"); },
                     }
                 },
@@ -234,14 +235,8 @@ pub fn build_gist_info(info: &Json, data: &[Datum]) -> gist::Info {
 /// The gist name is defined to be the name of its first file,
 /// as this is how GitHub page itself picks it.
 pub fn gist_name_from_info(info: &Json) -> Option<&str> {
-    let files = try_opt!(info.find("files").and_then(|fs| fs.as_object()));
-    let mut filenames: Vec<_> = files.keys().map(|s| s as &str).collect();
-    if filenames.is_empty() {
-        None
-    } else {
-        filenames.sort();
-        Some(filenames[0])
-    }
+    let filenames = try_opt!(gist_filenames_from_info(info));
+    Some(filenames[0])
 }
 
 /// Retrieve gist owner from the parsed JSON of gist info.
@@ -251,10 +246,46 @@ pub fn gist_owner_from_info(info: &Json) -> &str {
 }
 
 /// Retrieve gist language, if known, from the parsed JSON of gist info.
-pub fn gist_language_from_info(info: &Json) -> Option<&str> {
-    let filename = try_opt!(gist_name_from_info(info));
-    let language = try_opt!(info.find_path(&["files", filename, "language"]));
-    language.as_str().map(|s| s as &str)
+pub fn gist_language_from_info(info: &Json) -> Option<Cow<str>> {
+    let filenames = try_opt!(gist_filenames_from_info(info));
+    let get_lang = |filename| {
+        info.find_path(&["files", filename, "language"])
+            .and_then(Json::as_str).map(|s| s as &str)
+    };
+
+    // If there is just one file, its language is the language of the gist.
+    if filenames.len() == 1 {
+        let language = try_opt!(get_lang(filenames[0]));
+        return Some(Cow::Borrowed(language));
+    }
+
+    // Otherwise, include the languages of all files, in order, w/o repetitions.
+    // (This makes the language of the gist's namesake to appear first).
+    let mut languages = Vec::with_capacity(filenames.len());
+    let mut langset: HashSet<&str> = HashSet::new();
+    for filename in filenames {
+        if let Some(lang) = get_lang(filename) {
+            if !langset.contains(lang) {
+                languages.push(lang);
+                langset.insert(lang);
+            }
+        }
+    }
+    let result = languages.join(", ").to_string();
+    Some(Cow::Owned(result))
+}
+
+/// Retrieve the names of the files a gist consists of from the parsed JSON of gist info.
+/// The names are sorted alphabetically.
+fn gist_filenames_from_info(info: &Json) -> Option<Vec<&str>> {
+    let files = try_opt!(info.find("files").and_then(|fs| fs.as_object()));
+    let mut filenames: Vec<_> = files.keys().map(|s| s as &str).collect();
+     if filenames.is_empty() {
+        None
+    } else {
+        filenames.sort();
+        Some(filenames)
+    }
 }
 
 

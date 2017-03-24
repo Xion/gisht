@@ -20,7 +20,7 @@ custom_derive! {
         /// The meaning of this URL is host-specific, but it's typically
         /// either a text/plain gist code, or a repository URL.
         RawUrl,
-        /// Programming language the gist is written in.
+        /// Programming language(s) the gist is written in.
         Language,
         /// Description of the gist, typically provided by the owner upon creation.
         Description,
