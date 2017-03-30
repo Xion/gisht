@@ -234,7 +234,7 @@ impl Basic {
     fn sanitize_url<'u>(&self, url: &'u str) -> Cow<'u, str> {
         let mut url = Cow::Borrowed(url.trim().trim_right_matches("/"));
 
-        //  Convert between HTTPS and HTTP if necessary.
+        // Convert between HTTPS and HTTP if necessary.
         let (canonical_proto, other_http_proto);
         if self.html_url_pattern.starts_with(HTTP) {
             canonical_proto = HTTP;

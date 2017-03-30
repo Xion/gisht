@@ -89,8 +89,9 @@ lazy_static! {
 
     /// Directory where gist sources are stored.
     ///
-    /// Subdirectories are structured by host & the remaining part of gist URI,
-    /// e.g. `~/.gisht/gists/gh/Octocat/foo` (a directory) for `gh:Octocat/foo`.
+    /// Subdirectories are structured in a host-specific way,
+    /// usually in a flat structure of gist ID-named directories
+    /// e.g. `~/.gisht/gists/gh/4242` (a directory) for some `gh:Octocat/foo`.
     static ref GISTS_DIR: PathBuf = APP_DIR.join("gists");
 
     /// Directory where (symbolic) links to gist "binaries" are stored.

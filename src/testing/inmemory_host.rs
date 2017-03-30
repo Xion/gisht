@@ -19,17 +19,30 @@ struct StoredGist {
 }
 
 impl StoredGist {
+    #[inline]
     pub fn new(gist: Gist, url: String) -> Self {
         StoredGist{gist: Some(gist), url: Some(url)}
     }
+
+    #[inline]
+    pub fn with_gist(gist: Gist) -> Self {
+        StoredGist{gist: Some(gist), url: None}
+    }
+
+    #[inline]
+    pub fn with_broken_url(url: String) -> Self {
+        StoredGist{gist: None, url: Some(url)}
+    }
 }
 impl From<Gist> for StoredGist {
+    #[inline]
     fn from(gist: Gist) -> Self {
-        StoredGist{gist: Some(gist), url: None}
+        StoredGist::with_gist(gist)
     }
 }
 
 impl StoredGist {
+    #[inline]
     pub fn is_available(&self) -> bool {
         self.gist.is_some()
     }
@@ -40,6 +53,7 @@ impl StoredGist {
         Some(id.as_str())
     }
 
+    #[inline]
     pub fn uri(&self) -> Option<&gist::Uri> {
         self.gist.as_ref().map(|g| &g.uri)
     }
@@ -142,6 +156,17 @@ impl InMemoryHost {
             panic!("Tried to put gist {:?} under a duplicate URL: {}", gist, url);
         }
         gists.push(StoredGist::new(gist, url));
+    }
+
+    /// Put a URL into gist collection that doesn't correspond to any gist.
+    /// The URL will cause an error when resolved.
+    pub fn put_broken_url<U: ToString>(&self, url: U) {
+        let url = url.to_string();
+        let mut gists = self.gists.write().unwrap();
+        if gists.iter().find(|sg| sg.url.as_ref() == Some(&url)).is_some() {
+            panic!("Tried to duplicate the URL: {}", url);
+        }
+        gists.push(StoredGist::with_broken_url(url));
     }
 
     /// Remove the gist from in-memory collection.

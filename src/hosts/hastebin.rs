@@ -177,6 +177,20 @@ mod tests {
     }
 
     #[test]
+    fn resolve_url_errors_on_broken_url() {
+        let host = internal::Hastebin{inner: InMemoryHost::with_id(ID)};
+
+        let url = "https://hastebin.com/fubared";
+        host.inner.put_broken_url(url);
+
+        let result = host.resolve_url(url).unwrap() ;
+        assert!(result.is_err(), "Resolving a broken URL unexpectedly succeeded");
+        let error_msg = format!("{}", result.unwrap_err());
+        assert!(error_msg.contains(url),
+            "Error message didn't contain the URL `{}`", url);
+    }
+
+    #[test]
     fn gist_url_includes_extension() {
         let host = internal::Hastebin{inner: InMemoryHost::with_id(ID)};
 
