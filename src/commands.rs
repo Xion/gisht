@@ -1,5 +1,6 @@
 //! Module implementing various commands that can be performed on gists.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
@@ -14,7 +15,7 @@ use util::exitcode;
 
 
 /// Run the specified gist.
-/// Regardless whether or not it succceeds, this function does not return.
+/// Regardless whether or not it succeeds, this function does not return.
 pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
     let uri = gist.uri.clone();
     let binary = gist.binary_path();
@@ -36,17 +37,14 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
         debug!("Executing {:?} failed: {}", command, error);
 
         // If the problem was the executable format, it may be a lack of proper hashbang.
-        // We'll try to infer a common interpreter based on gist's file extension
+        // We'll try to infer a common interpreter based on gist's metadata
         // and feed it to its interpreter manually.
         if error.raw_os_error() == Some(ERR_EXEC_FORMAT) {
             trace!("Invalid executable format of {}", binary.display());
             warn!("Couldn't run gist {} directly; it may not have a proper hashbang.", uri);
-            if let Some(interpreter) = guess_interpreter(&binary) {
+            if let Some(interpreter) = guess_interpreter(gist) {
                 error = interpreted_run(interpreter, &binary, args);
             } else {
-                // TODO: use other signals to infer the interpreter:
-                // * gist_info/Language
-                // * hashang
                 error!("Failed to guess an interpreter for gist {}", uri);
             }
         }
@@ -65,10 +63,20 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
     }
 }
 
+/// Guess an interpreter for given gist, using a variety of factors.
+/// Returns the "format string" for the interpreter's command string.
+#[cfg(unix)]
+fn guess_interpreter(gist: &Gist) -> Option<&'static str> {
+    // TODO: use other signals to infer the interpreter:
+    // * hashbang
+    guess_interpreter_for_filename(gist.binary_path())
+        .or_else(|| gist.main_language().and_then(guess_interpreter_for_language))
+}
+
 /// Guess an interpreter for given binary file based on its file extension.
 /// Returns the "format string" for the interpreter's command string.
 #[cfg(unix)]
-fn guess_interpreter<P: AsRef<Path>>(binary_path: P) -> Option<&'static str> {
+fn guess_interpreter_for_filename<P: AsRef<Path>>(binary_path: P) -> Option<&'static str> {
     let binary_path = binary_path.as_ref();
     trace!("Trying to guess an interpreter for {}", binary_path.display());
 
@@ -83,8 +91,27 @@ fn guess_interpreter<P: AsRef<Path>>(binary_path: P) -> Option<&'static str> {
 
     let extension = try_opt!(extension.to_str());
     let interpreter = try_opt!(COMMON_INTERPRETERS.get(&extension));
-    debug!("Guessed the interpreter as `{}`",
-        interpreter.split_whitespace().next().unwrap());
+    debug!("Guessed the interpreter for {} as `{}`",
+        binary_path.display(), interpreter.split_whitespace().next().unwrap());
+    Some(interpreter)
+}
+
+/// Guess an interpreter for a file written in given language.
+/// Returns the "format string" for the interpreter's command string.
+#[cfg(unix)]
+fn guess_interpreter_for_language(language: &str) -> Option<&'static str> {
+    trace!("Trying to guess an interpreter for {} language", language);
+
+    let lang: Cow<str> = if language.chars().all(char::is_lowercase) {
+        Cow::Borrowed(language)
+    } else {
+        Cow::Owned(language.to_lowercase())
+    };
+
+    let extension = try_opt!(LANGUAGE_MAP.get(&*lang));
+    let interpreter = try_opt!(COMMON_INTERPRETERS.get(extension));
+    debug!("Guessed the interpreter for {} language as `{}`",
+        language, interpreter.split_whitespace().next().unwrap());
     Some(interpreter)
 }
 
@@ -117,6 +144,17 @@ fn interpreted_run<P: AsRef<Path>>(interpreter: &str,
 
 #[cfg(unix)]
 lazy_static! {
+    /// Mapping of language names (lowercase) to their file extensions.
+    static ref LANGUAGE_MAP: HashMap<&'static str, &'static str> = hashmap!{
+        "bash" => "sh",
+        "haskell" => "hs",
+        "javascript" => "js",
+        "perl" => "pl",
+        "python" => "py",
+        "ruby" => "rb",
+        "shell" => "sh",
+    };
+
     /// Mapping of common interpreters from file extensions they can handle.
     ///
     /// Interpreters are defined as shell commands with placeholders
@@ -201,18 +239,37 @@ mod tests {
     mod unix {
         use shlex;
         use regex::Regex;
-        use super::super::COMMON_INTERPRETERS;
+        use super::super::{COMMON_INTERPRETERS, LANGUAGE_MAP};
+
+        lazy_static! {
+            static ref LOWERCASE_RE: Regex = Regex::new("^[a-z]+$").unwrap();
+        }
+
+        #[test]
+        fn language_names() {
+            for lang in LANGUAGE_MAP.keys() {
+                assert!(LOWERCASE_RE.is_match(lang),
+                    "Language name `{}` doesn't match the expected form {}", lang, *LOWERCASE_RE);
+            }
+        }
+
+        #[test]
+        fn language_file_extensions() {
+            for ext in LANGUAGE_MAP.values() {
+                assert!(!ext.starts_with("."),
+                    "`{}` file extension must not start with a dot", ext);
+                assert!(LOWERCASE_RE.is_match(ext),
+                    "`{}` extension doesn't match the expected form {}", ext, *LOWERCASE_RE);
+            }
+        }
 
         #[test]
         fn interpreter_file_extensions() {
-            lazy_static! {
-                static ref EXTENSION_RE: Regex = Regex::new("^[a-z]+$").unwrap();
-            }
             for ext in COMMON_INTERPRETERS.keys() {
                 assert!(!ext.starts_with("."),
                     "`{}` extension must not start with a dot", ext);
-                assert!(EXTENSION_RE.is_match(ext),
-                    "`{}` extension doesn't match the expected form {}", ext, *EXTENSION_RE);
+                assert!(LOWERCASE_RE.is_match(ext),
+                    "`{}` extension doesn't match the expected form {}", ext, *LOWERCASE_RE);
             }
         }
 

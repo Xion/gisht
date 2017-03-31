@@ -164,6 +164,12 @@ impl InfoBuilder {
     }
 }
 
+impl Default for InfoBuilder {
+    fn default() -> Self {
+        InfoBuilder::new()
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

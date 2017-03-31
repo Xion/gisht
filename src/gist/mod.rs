@@ -7,6 +7,7 @@ mod info;
 mod uri;
 
 
+use std::borrow::Cow;
 use std::path::PathBuf;
 
 use super::{BIN_DIR, GISTS_DIR};
@@ -92,6 +93,19 @@ impl Gist {
         } else {
             None
         }
+    }
+
+    /// Retrieve the main language this gist has been written in, if known.
+    pub fn main_language(&self) -> Option<&str> {
+        let info = try_opt!(self.info.as_ref());
+
+        // To be able to return Option<&str> rather than Option<String>,
+        // we need to get the underlying reference from Cow returned by Info::get.
+        let csv_langs = match info.get(Datum::Language) {
+            Cow::Borrowed(lang) => lang,
+            _ => return None,  // Language field is default/unknown.
+        };
+        csv_langs.split(",").map(|l| l.trim()).next()
     }
 }
 
