@@ -276,7 +276,7 @@ fn display_warning() -> bool {
 fn format_warning_message() -> String {
     const PREFIX: &'static str = "WARNING";
     const WARNING: &'static [&'static str] = &[
-        "gisht is used to download & run code from remote sources.",
+        "${app} is used to download & run code from remote sources.",
         "",
         "Never run gists that you haven't authored, and/or do not trust.",
         "Doing so is dangerous, and may expose your system to security risks!",
@@ -286,7 +286,8 @@ fn format_warning_message() -> String {
     ];
     let prefix_style =
         if cfg!(unix) { Colour::Yellow.bold() } else { Style::default() };
-    format!("{}: {}", prefix_style.paint(PREFIX), WARNING.join(util::LINESEP))
+    format!("{}: {}", prefix_style.paint(PREFIX),
+        WARNING.join(util::LINESEP).replace("${app}", *NAME))
 }
 
 /// Return the formatted prompt for warning acknowledgment.

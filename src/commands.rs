@@ -102,14 +102,30 @@ fn guess_interpreter_for_filename<P: AsRef<Path>>(binary_path: P) -> Option<&'st
 fn guess_interpreter_for_language(language: &str) -> Option<&'static str> {
     trace!("Trying to guess an interpreter for {} language", language);
 
+    // Make the language name lowercase.
     let lang: Cow<str> = if language.chars().all(char::is_lowercase) {
         Cow::Borrowed(language)
     } else {
         Cow::Owned(language.to_lowercase())
     };
 
-    let extension = try_opt!(LANGUAGE_MAP.get(&*lang));
-    let interpreter = try_opt!(COMMON_INTERPRETERS.get(extension));
+    // Determine the file extension for this language.
+    // In some cases, the "language" may actually be an extension already,
+    // so check for that case, too.
+    let extension: Cow<str> =
+        if LANGUAGE_MAP.values().any(|&ext| ext == &*lang) {
+            lang
+        } else {
+            match LANGUAGE_MAP.get(&*lang) {
+                Some(ext) => Cow::Borrowed(ext),
+                None => {
+                    debug!("Unsupported gist language: {}", language);
+                    return None;
+                },
+            }
+        };
+
+    let interpreter = try_opt!(COMMON_INTERPRETERS.get(&*extension));
     debug!("Guessed the interpreter for {} language as `{}`",
         language, interpreter.split_whitespace().next().unwrap());
     Some(interpreter)
@@ -145,13 +161,20 @@ fn interpreted_run<P: AsRef<Path>>(interpreter: &str,
 #[cfg(unix)]
 lazy_static! {
     /// Mapping of language names (lowercase) to their file extensions.
+    /// Note that the extension doesn't have to occur in COMMON_INTERPRETERS map.
     static ref LANGUAGE_MAP: HashMap<&'static str, &'static str> = hashmap!{
         "bash" => "sh",
+        "clojure" => "clj",
+        "go" => "go",
+        "golang" => "go",
         "haskell" => "hs",
         "javascript" => "js",
+        "node" => "js",
+        "nodejs" => "js",
         "perl" => "pl",
         "python" => "py",
         "ruby" => "rb",
+        "rust" => "rs",
         "shell" => "sh",
     };
 
