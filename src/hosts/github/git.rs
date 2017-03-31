@@ -65,7 +65,7 @@ pub fn reset_merge<P: AsRef<Path>>(repo_path: P) -> io::Result<()> {
 
 // Utility functions
 
-/// Convert a git2 library error to a generic Rust I/P error.
+/// Convert a git2 library error to a generic Rust I/O error.
 pub fn to_io_error(git_err: git2::Error) -> io::Error {
     io::Error::new(io::ErrorKind::Other, git_err)
 }

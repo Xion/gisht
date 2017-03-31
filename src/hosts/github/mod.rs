@@ -50,6 +50,7 @@ impl Host for GitHub {
         let gist = try!(resolve_gist(gist));
 
         if gist.is_local() {
+            trace!("Gist {} is locally present but may need updating", gist.uri);
             let update = match mode {
                 FetchMode::Auto => needs_update(&gist),
                 FetchMode::Always => true,
@@ -172,7 +173,7 @@ fn resolve_gist(gist: &Gist) -> io::Result<Cow<Gist>> {
         return Ok(gist);
     }
 
-    // TODO: copy over gist.info if it's there
+    // TODO: copy over gist.info if it's there in the input
 
     // If the gist doesn't have the ID associated with it,
     // resolve the owner/name by either checking the already existing,

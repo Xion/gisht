@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 use std::io;
+use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
 use gist::{self, Gist};
@@ -16,22 +17,41 @@ pub const INMEMORY_HOST_DEFAULT_ID: &'static str = "mem";
 struct StoredGist {
     gist: Option<Gist>,
     url: Option<String>,
+    content: Option<Vec<u8>>,
 }
 
 impl StoredGist {
     #[inline]
-    pub fn new(gist: Gist, url: String) -> Self {
-        StoredGist{gist: Some(gist), url: Some(url)}
+    pub fn new(gist: Gist, url: String, content: String) -> Self {
+        StoredGist{
+            gist: Some(gist),
+            url: Some(url),
+            content: Some(content.into_bytes()),
+        }
     }
 
     #[inline]
     pub fn with_gist(gist: Gist) -> Self {
-        StoredGist{gist: Some(gist), url: None}
+        StoredGist{gist: Some(gist), url: None, content: None}
+    }
+
+    #[inline]
+    pub fn with_gist_url(gist: Gist, url: String) -> Self {
+        StoredGist{gist: Some(gist), url: Some(url), content: None}
+    }
+
+    #[inline]
+    pub fn with_gist_content(gist: Gist, content: String) -> Self {
+        StoredGist{
+            gist: Some(gist),
+            url: None,
+            content: Some(content.into_bytes()),
+        }
     }
 
     #[inline]
     pub fn with_broken_url(url: String) -> Self {
-        StoredGist{gist: None, url: Some(url)}
+        StoredGist{gist: None, url: Some(url), content: None}
     }
 }
 impl From<Gist> for StoredGist {
@@ -57,13 +77,23 @@ impl StoredGist {
     pub fn uri(&self) -> Option<&gist::Uri> {
         self.gist.as_ref().map(|g| &g.uri)
     }
+
+    #[inline]
+    pub fn content_string(&self) -> Option<Result<String, FromUtf8Error>> {
+        self.content.clone().map(String::from_utf8)
+    }
+
+    #[inline]
+    pub fn content_bytes(&self) -> Option<&[u8]> {
+        self.content.as_ref().map(|c| &c[..])
+    }
 }
 
 
 /// Fake implementation of a gist Host that stores gists in memory.
 ///
-/// While it doesn't perform any disk or network I/O, it uses the following formats
-/// for its URLs:
+/// While it doesn't perform any disk or network I/O,
+/// it uses the following formats for its URLs:
 ///
 /// * gist URI format:: mem:$OWNER/$NAME
 /// * HTML URL format:: memory://html/id/$ID or memory://html/uri/$OWNER/$NAME
@@ -99,11 +129,23 @@ impl Host for InMemoryHost {
 
     fn fetch_gist(&self, gist: &Gist, _: FetchMode) -> io::Result<()> {
         let gists = self.gists.read().unwrap();
-        if gists.iter().find(|sg| sg.gist.as_ref() == Some(gist)).is_none() {
-            return Err(io::Error::new(io::ErrorKind::NotFound,
-                format!("Cannot find {:?}", gist)));
+        match gists.iter().find(|sg| sg.gist.as_ref() == Some(gist)) {
+            Some(sg) => {
+                if sg.content.is_some() {
+                    // Gist has content, so we "downloaded" it.
+                    Ok(())
+                } else {
+                    // This isn't something we'd expect a regular gist host to ever signal
+                    // (since none would make a distinction between "no content" and
+                    // "empty content"). It is however helpful in testing whether fetch_gist()
+                    // has been invoked with a correct gist argument.
+                    Err(io::Error::new(io::ErrorKind::UnexpectedEof,
+                        format!("{:?} doesn't contain any content", gist)))
+                }
+            },
+            None => Err(io::Error::new(io::ErrorKind::NotFound,
+                format!("Cannot find {:?}", gist))),
         }
-        Ok(())
     }
 
     fn gist_url(&self, gist: &Gist) -> io::Result<String> {
@@ -155,7 +197,7 @@ impl InMemoryHost {
         if gists.iter().find(|sg| sg.url.as_ref() == Some(&url)).is_some() {
             panic!("Tried to put gist {:?} under a duplicate URL: {}", gist, url);
         }
-        gists.push(StoredGist::new(gist, url));
+        gists.push(StoredGist::with_gist_url(gist, url));
     }
 
     /// Put a URL into gist collection that doesn't correspond to any gist.
