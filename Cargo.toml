@@ -8,7 +8,7 @@ homepage = "https://github.com/Xion/gisht"
 repository = "https://github.com/Xion/gisht"
 readme = "README.md"
 keywords = ["gist", "snippet", "GitHub", "pastebin", "shell"]
-license = "GPLv3"
+license = "GPLv2"
 
 [dependencies]
 ansi_term = "0.9"
