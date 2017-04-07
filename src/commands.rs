@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs;
-use std::io::{self, Read, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
 use std::process::{Command, exit};
 
@@ -13,6 +13,12 @@ use webbrowser;
 use gist::Gist;
 use util::exitcode;
 
+
+// TODO: make the functions here return the exitcode rather than
+// calling std::process::exit() themselves for better testability
+
+
+// Running gists.
 
 /// Run the specified gist.
 /// Regardless whether or not it succeeds, this function does not return.
@@ -30,16 +36,17 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
     // but on Windows, we have to run it as a child process and wait for it.
     if cfg!(unix) {
         use std::os::unix::process::CommandExt;
-        const ERR_EXEC_FORMAT: i32 = 8;
+        const ERR_NO_SUCH_FILE: i32 = 2;  // For when hashbang is present but wrong.
+        const ERR_EXEC_FORMAT: i32 = 8;  // For when hashbang is absent.
 
         // This calls execvp() and doesn't return unless an error occurred.
         let mut error = command.exec();
         debug!("Executing {:?} failed: {}", command, error);
 
-        // If the problem was the executable format, it may be a lack of proper hashbang.
-        // We'll try to infer a common interpreter based on gist's metadata
+        // If the problem was with hashbang (or lack thereof),
+        // we'll try to infer a common interpreter based on gist's metadata
         // and feed it to its interpreter manually.
-        if error.raw_os_error() == Some(ERR_EXEC_FORMAT) {
+        if [ERR_NO_SUCH_FILE, ERR_EXEC_FORMAT].iter().any(|&e| error.raw_os_error() == Some(e)) {
             trace!("Invalid executable format of {}", binary.display());
             warn!("Couldn't run gist {} directly; it may not have a proper hashbang.", uri);
             if let Some(interpreter) = guess_interpreter(gist) {
@@ -63,20 +70,23 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
     }
 }
 
+/// Type of an interpreter command line.
+type Interpreter = &'static str;
+
 /// Guess an interpreter for given gist, using a variety of factors.
 /// Returns the "format string" for the interpreter's command string.
 #[cfg(unix)]
-fn guess_interpreter(gist: &Gist) -> Option<&'static str> {
-    // TODO: use other signals to infer the interpreter:
-    // * hashbang
-    guess_interpreter_for_filename(gist.binary_path())
+fn guess_interpreter(gist: &Gist) -> Option<Interpreter> {
+    let binary_path = gist.binary_path();
+    guess_interpreter_for_filename(&binary_path)
         .or_else(|| gist.main_language().and_then(guess_interpreter_for_language))
+        .or_else(|| guess_interpreter_for_hashbang(&binary_path))
 }
 
 /// Guess an interpreter for given binary file based on its file extension.
 /// Returns the "format string" for the interpreter's command string.
 #[cfg(unix)]
-fn guess_interpreter_for_filename<P: AsRef<Path>>(binary_path: P) -> Option<&'static str> {
+fn guess_interpreter_for_filename<P: AsRef<Path>>(binary_path: P) -> Option<Interpreter> {
     let binary_path = binary_path.as_ref();
     trace!("Trying to guess an interpreter for {}", binary_path.display());
 
@@ -99,7 +109,7 @@ fn guess_interpreter_for_filename<P: AsRef<Path>>(binary_path: P) -> Option<&'st
 /// Guess an interpreter for a file written in given language.
 /// Returns the "format string" for the interpreter's command string.
 #[cfg(unix)]
-fn guess_interpreter_for_language(language: &str) -> Option<&'static str> {
+fn guess_interpreter_for_language(language: &str) -> Option<Interpreter> {
     trace!("Trying to guess an interpreter for {} language", language);
 
     // Make the language name lowercase.
@@ -131,11 +141,56 @@ fn guess_interpreter_for_language(language: &str) -> Option<&'static str> {
     Some(interpreter)
 }
 
+/// Guess an interpreter for a file based on its hashbang.
+/// Returns the "format string" for the interpreter's command string.
+#[cfg(unix)]
+fn guess_interpreter_for_hashbang<P: AsRef<Path>>(binary_path: P) -> Option<Interpreter> {
+    let binary_path = binary_path.as_ref();
+    trace!("Trying to guess an interpreter for a possible hashbang in {}",
+        binary_path.display());
+
+    // Get the path mentioned in the hashbang, if any.
+    let file = try_opt!(fs::File::open(binary_path).ok());
+    let reader = BufReader::new(file);
+    let first_line = try_opt!(reader.lines().next().and_then(|l| l.ok()));
+    if !first_line.starts_with("#!") {
+        debug!("Gist binary {} doesn't start with a hashbang", binary_path.display());
+        return None;
+    }
+    let hashbang_path = &first_line[2..];
+
+    // Check if a single known interpreter path starts with the program name,
+    // or the entire hashbang path.
+    let program = Path::new(hashbang_path).file_name().and_then(|n| n.to_str());
+    let prefix = program.map(|p| p.to_owned() + " ");
+    let mut interpreters = vec![];
+    for &cmdline in COMMON_INTERPRETERS.values() {
+        let starts_with_program = prefix.as_ref()
+            .map(|p| cmdline.starts_with(p)).unwrap_or(false);
+        if cmdline.starts_with(&hashbang_path) || starts_with_program {
+            interpreters.push(cmdline);
+        }
+    }
+    match interpreters.len() {
+        0 => None,
+        1 => {
+            debug!("Guessed the interpreter for hashbang #!{} as `{}`",
+                hashbang_path, interpreters[0]);
+            Some(interpreters[0])
+        },
+        _ => {
+            debug!("Ambiguous hashbang #!{} resolves to multiple possible interpreters:\n{}",
+                hashbang_path, interpreters.join("\n"));
+            None
+        },
+    }
+}
+
 /// Execute a script using given interpreter.
 /// The interpreter must be a "format string" containing placeholders
 /// for script path and arguments.
 #[cfg(unix)]
-fn interpreted_run<P: AsRef<Path>>(interpreter: &str,
+fn interpreted_run<P: AsRef<Path>>(interpreter: Interpreter,
                                    script: P, args: &[String]) -> io::Error {
     use std::os::unix::process::CommandExt;
 
@@ -148,6 +203,7 @@ fn interpreted_run<P: AsRef<Path>>(interpreter: &str,
 
     // Split the final interpreter-invoking command into "argv"
     // that can be executed via Command/execvp().
+    trace!("$ {}", cmd);
     let cmd_argv = shlex::split(&cmd).unwrap();
     let mut command = Command::new(&cmd_argv[0]);
     command.args(&cmd_argv[1..]);
@@ -182,7 +238,7 @@ lazy_static! {
     ///
     /// Interpreters are defined as shell commands with placeholders
     /// for gist script name and its arguments.
-    static ref COMMON_INTERPRETERS: HashMap<&'static str, &'static str> = hashmap!{
+    static ref COMMON_INTERPRETERS: HashMap<&'static str, Interpreter> = hashmap!{
         "hs" => "runhaskell ${script} ${args}",
         "js" => "node -e ${script} ${args}",
         "pl" => "perl -- ${script} ${args}",
