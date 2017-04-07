@@ -31,6 +31,8 @@
 #[macro_use] extern crate log;
 // TODO: when migrating to slog completely, `log` can be removed and order restored
 
+#[cfg(test)] extern crate tempfile;
+
 
 #[macro_use]
 mod util;

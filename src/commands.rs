@@ -316,9 +316,14 @@ pub fn show_gist_info(gist: &Gist) -> ! {
 mod tests {
     #[cfg(unix)]
     mod unix {
+        use std::io::Write;
         use shlex;
+        use tempfile::NamedTempFile;
         use regex::Regex;
-        use super::super::{COMMON_INTERPRETERS, LANGUAGE_MAP};
+        use super::super::{COMMON_INTERPRETERS, LANGUAGE_MAP,
+                           guess_interpreter_for_filename,
+                           guess_interpreter_for_language,
+                           guess_interpreter_for_hashbang};
 
         lazy_static! {
             static ref LOWERCASE_RE: Regex = Regex::new("^[a-z]+$").unwrap();
@@ -375,6 +380,38 @@ mod tests {
                 assert!(cmd_argv.unwrap().len() >= 3,  // interpreter + script path + script args
                     "Formatted `{}` is way too short to be valid", cmd);
             }
+        }
+
+        #[test]
+        fn interpreter_for_filename() {
+            let guess = guess_interpreter_for_filename;
+            assert_eq!(None, guess("/foo/bar"));  // no extension
+            assert_eq!(None, guess("/foo.lolwtf"));  // unknown extension
+            assert_eq!(Some("python ${script} - ${args}"), guess("/foo.py"));
+        }
+
+        #[test]
+        fn interpreter_for_language() {
+            let guess = guess_interpreter_for_language;
+            assert_eq!(None, guess(""));
+            assert_eq!(None, guess("GNU/Ruby#.NET"));
+            assert_eq!(Some("python ${script} - ${args}"), guess("Python"));
+        }
+
+        #[test]
+        fn interpreter_for_hashbang() {
+            let guess = |hashbang: &str| {
+                // Prepare a temp file with the first line being the hashbang.
+                let mut tmpfile = NamedTempFile::new().unwrap();
+                let line = hashbang.to_owned() + "\n";
+                tmpfile.write_all(&line.into_bytes()).unwrap();
+                // Guess the interpreter for its path.
+                guess_interpreter_for_hashbang(tmpfile.path())
+            };
+            assert_eq!(None, guess(""));
+            assert_eq!(None, guess("/not/a/hashbang/but/python"));
+            assert_eq!(Some("python ${script} - ${args}"), guess("#!python"));
+            assert_eq!(Some("python ${script} - ${args}"), guess("#!/usr/bin/python"));
         }
     }
 }
