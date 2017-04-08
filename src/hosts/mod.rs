@@ -11,6 +11,7 @@ mod bpaste;
 mod hastebin;
 mod heypasteit;
 mod lpaste;
+mod mibpaste;
 mod mozilla;
 mod paste;
 mod pastebin;
@@ -102,6 +103,7 @@ lazy_static! {
         mozilla::ID => Arc::new(mozilla::create()) as Arc<Host>,
         paste::ID => Arc::new(paste::create()) as Arc<Host>,
         hastebin::ID => Arc::new(hastebin::Hastebin::new()) as Arc<Host>,
+        mibpaste::ID => Arc::new(mibpaste::Mibpaste::new()) as Arc<Host>,
     };
 }
 #[cfg(not(test))]

@@ -9,6 +9,7 @@
 #[macro_use] extern crate enum_derive;
 #[macro_use] extern crate error_derive;
              extern crate git2;
+             extern crate htmlescape;
              extern crate hyper;
              extern crate isatty;
 #[macro_use] extern crate lazy_static;
