@@ -106,7 +106,7 @@ lazy_static! {
 
 fn main() {
     let opts = args::parse().unwrap_or_else(|e| {
-        print_args_error(e);
+        print_args_error(e).unwrap();
         exit(exitcode::EX_USAGE);
     });
 
@@ -129,7 +129,7 @@ fn main() {
 }
 
 /// Print an error that may occur while parsing arguments.
-fn print_args_error(e: ArgsError) {
+fn print_args_error(e: ArgsError) -> io::Result<()> {
     match e {
         ArgsError::Parse(ref e) =>
             // In case of generic parse error,
@@ -142,7 +142,7 @@ fn print_args_error(e: ArgsError) {
             }
             writeln!(&mut io::stderr(), "{}", msg)
         },
-    }.unwrap();
+    }
 }
 
 
@@ -158,7 +158,7 @@ fn ensure_app_dir(opts: &Options) -> Result<(), ExitCode> {
     // If the first run is interactive, display a warning about executing untrusted code.
     if isatty::stderr_isatty() && !opts.quiet() {
         trace!("Displaying warning about executing untrusted code...");
-        let should_continue = display_warning();
+        let should_continue = display_warning().unwrap();
         if !should_continue {
             debug!("Warning not acknowledged -- exiting.");
             return Err(2);
@@ -269,14 +269,14 @@ fn gist_from_url(url: &str) -> Result<Option<Gist>, ExitCode> {
 
 /// Display warning about executing untrusted code and ask the user to continue.
 /// Returns whether the user decided to continue.
-fn display_warning() -> bool {
-    writeln!(&mut io::stderr(), "{}", format_warning_message()).unwrap();
+fn display_warning() -> io::Result<bool> {
+    try!(writeln!(&mut io::stderr(), "{}", format_warning_message()));
 
-    write!(&mut io::stderr(), "{}", format_warning_ack_prompt()).unwrap();
+    try!(write!(&mut io::stderr(), "{}", format_warning_ack_prompt()));
     let mut answer = String::with_capacity(YES.len());
-    io::stdin().read_line(&mut answer).unwrap();
+    try!(io::stdin().read_line(&mut answer));
 
-    answer.trim().to_lowercase() == YES
+    Ok(answer.trim().to_lowercase() == YES)
 }
 
 /// Return the formatted warning message, incl. coloring if the terminal supports it.
