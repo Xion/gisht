@@ -329,16 +329,17 @@ pub fn show_gist_info(gist: &Gist) -> ExitCode {
     trace!("Obtaining information on {:?}", gist);
     match gist.uri.host().gist_info(gist) {
         Ok(Some(info)) => {
-            debug!("Successfully obtained information on {:?}", gist);
+            debug!("Successfully obtained {} piece(s) of information on {:?}",
+                info.len(), gist);
             print!("{}", info);
             exitcode::EX_OK
         },
         Ok(None) => {
-            warn!("No information available about gist {}", gist.uri);
+            warn!("No information available about {:?}", gist);
             exitcode::EX_UNAVAILABLE
         },
         Err(e) => {
-            error!("Failed to obtain information about gist {}: {}", gist.uri, e);
+            error!("Failed to obtain information about {:?}: {}", gist, e);
             exitcode::EX_UNKNOWN
         },
     }

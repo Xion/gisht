@@ -64,7 +64,7 @@ pub type Value = String;
 
 
 /// Information about a particular gist.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Info {
     data: BTreeMap<Datum, Value>,
 }
@@ -83,9 +83,22 @@ impl Info {
         }
     }
 
+    /// Returns the number of pieces of data available about the gist.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
     #[inline]
     pub fn to_builder(self) -> InfoBuilder {
         InfoBuilder{data: self.data}
+    }
+}
+
+impl fmt::Debug for Info {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(fmt, "{}", "gist::Info"));
+        fmt.debug_map().entries(self.data.iter()).finish()
     }
 }
 
@@ -101,7 +114,7 @@ impl fmt::Display for Info {
 
 
 /// Builder for the gist Info struct.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct InfoBuilder {
     data: BTreeMap<Datum, Value>,
 }
@@ -161,6 +174,13 @@ impl InfoBuilder {
     #[inline]
     pub fn build(self) -> Info {
         Info{data: self.data}
+    }
+}
+
+impl fmt::Debug for InfoBuilder {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(fmt, "{}", "gist::InfoBuilder"));
+        fmt.debug_map().entries(self.data.iter()).finish()
     }
 }
 
