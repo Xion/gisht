@@ -14,15 +14,11 @@ use gist::Gist;
 use util::exitcode::{self, ExitCode};
 
 
-// TODO: make the functions here return the exitcode rather than
-// calling std::process::exit() themselves for better testability
-
-
-// Running gists.
-
 /// Run the specified gist.
+///
 /// If this function succeeds, it may not return (because the process will be
-/// completely replaced by the gist binary)/
+/// completely replaced by the gist binary).
+///
 /// Otherwise, an exit code is returned.
 pub fn run_gist(gist: &Gist, args: &[String]) -> ExitCode {
     let uri = gist.uri.clone();
@@ -58,15 +54,24 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ExitCode {
             }
         }
         error!("Failed to execute gist {}: {}", uri, error);
-        1
+        exitcode::EX_UNKNOWN
     } else {
-        let mut run = command.spawn()
-            .unwrap_or_else(|e| panic!("Failed to execute gist {}: {}", uri, e));
+        let mut run = match command.spawn() {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Failed to execute gist {}: {}", uri, e);
+                return exitcode::EX_TEMPFAIL;
+            }
+        };
 
         // Propagate the same exit code that the gist binary returned.
-        let exit_status = run.wait().unwrap_or_else(|e| {
-            panic!("Failed to obtain status code for gist {}: {}", uri, e)
-        });
+        let exit_status = match run.wait() {
+            Ok(es) => es,
+            Err(e) => {
+                error!("Failed to obtain status code for gist {}: {}", uri, e);
+                return exitcode::EX_TEMPFAIL;
+            },
+        };
         exit_status.code().unwrap_or(exitcode::EX_TEMPFAIL)
     }
 }
@@ -160,24 +165,34 @@ fn guess_interpreter_for_hashbang<P: AsRef<Path>>(binary_path: P) -> Option<Inte
     }
     let hashbang_path = &first_line[2..];
 
+    // XXX: don't assume the entire hashbang is a path; POSIX allows a single argument
+    // to appear after it, too
+    // TODO: treat `#!/usr/bin/env foo` hashbangs specially:
+    // `foo` should be the program there
+
     // Check if a single known interpreter path starts with the program name,
     // or the entire hashbang path.
     let program = Path::new(hashbang_path).file_name().and_then(|n| n.to_str());
-    let prefix = program.map(|p| p.to_owned() + " ");
+    let program_prefix = program.map(|p| p.to_owned() + " ");
+    let path_prefix = hashbang_path.to_owned() + " ";
     let mut interpreters = vec![];
     for &cmdline in COMMON_INTERPRETERS.values() {
-        let starts_with_program = prefix.as_ref()
+        let starts_with_program = program_prefix.as_ref()
             .map(|p| cmdline.starts_with(p)).unwrap_or(false);
-        if cmdline.starts_with(&hashbang_path) || starts_with_program {
+        if cmdline.starts_with(&path_prefix) || starts_with_program {
             interpreters.push(cmdline);
         }
     }
     match interpreters.len() {
-        0 => None,
+        0 => {
+            debug!("Unrecognized gist binary hashbang: #!{}", hashbang_path);
+            None
+        },
         1 => {
+            let result = interpreters[0];
             debug!("Guessed the interpreter for hashbang #!{} as `{}`",
-                hashbang_path, interpreters[0]);
-            Some(interpreters[0])
+                hashbang_path, result);
+            Some(result)
         },
         _ => {
             debug!("Ambiguous hashbang #!{} resolves to multiple possible interpreters:\n{}",
@@ -261,18 +276,29 @@ pub fn print_binary_path(gist: &Gist) -> ExitCode {
 /// Print the source of the gist's binary.
 pub fn print_gist(gist: &Gist) -> ExitCode {
     trace!("Printing source code of {:?}", gist);
-    let mut binary = fs::File::open(gist.binary_path()).unwrap_or_else(|e| {
-        panic!("Failed to open the binary of gist {}: {}", gist.uri, e)
-    });
+    let mut binary = match fs::File::open(gist.binary_path()) {
+        Ok(file) => file,
+        Err(e) => {
+            error!("Failed to open the binary of gist {}: {}", gist.uri, e);
+            return exitcode::EX_IOERR;
+        },
+    };
 
     const BUF_SIZE: usize = 256;
     let mut buf = [0; BUF_SIZE];
     loop {
-        let c = binary.read(&mut buf).unwrap_or_else(|e| {
-            panic!("Failed to read the binary of gist {}: {}", gist.uri, e)
-        });
+        let c = match binary.read(&mut buf) {
+            Ok(c) => c,
+            Err(e) => {
+                error!("Failed to read the binary of gist {}: {}", gist.uri, e);
+                return exitcode::EX_IOERR;
+            },
+        };
         if c > 0 {
-            io::stdout().write_all(&buf[0..c]).unwrap();
+            if let Err(e) = io::stdout().write_all(&buf[0..c]) {
+                error!("Failed to write the gist {} to stdout: {}", gist.uri, e);
+                return exitcode::EX_IOERR;
+            }
         }
         if c < BUF_SIZE { break }
     }
@@ -282,13 +308,18 @@ pub fn print_gist(gist: &Gist) -> ExitCode {
 
 /// Open the gist's HTML page in the default system browser.
 pub fn open_gist(gist: &Gist) -> ExitCode {
-    let url = gist.uri.host().gist_url(gist).unwrap_or_else(|e| {
-        panic!("Failed to determine the URL of gist {}: {}", gist.uri, e)
-    });
-    webbrowser::open(&url).unwrap_or_else(|e| {
-        panic!("Failed to open the URL of gist {} ({}) in the browser: {}",
-            gist.uri, url, e)
-    });
+    let url = match gist.uri.host().gist_url(gist) {
+        Ok(url) => url,
+        Err(e) => {
+            error!("Failed to determine the URL of gist {}: {}", gist.uri, e);
+            return exitcode::EX_UNAVAILABLE;
+        },
+    };
+    if let Err(e) = webbrowser::open(&url) {
+        error!("Failed to open the URL of gist {} ({}) in the browser: {}",
+            gist.uri, url, e);
+        return exitcode::EX_UNKNOWN;
+    };
     exitcode::EX_OK
 }
 
@@ -296,18 +327,19 @@ pub fn open_gist(gist: &Gist) -> ExitCode {
 /// Show summary information about the gist.
 pub fn show_gist_info(gist: &Gist) -> ExitCode {
     trace!("Obtaining information on {:?}", gist);
-    let maybe_info = gist.uri.host().gist_info(gist).unwrap_or_else(|e| {
-        panic!("Failed to obtain information about gist {}: {}", gist.uri, e);
-    });
-    match maybe_info {
-        Some(info) => {
+    match gist.uri.host().gist_info(gist) {
+        Ok(Some(info)) => {
             debug!("Successfully obtained information on {:?}", gist);
             print!("{}", info);
             exitcode::EX_OK
         },
-        None => {
+        Ok(None) => {
             warn!("No information available about gist {}", gist.uri);
             exitcode::EX_UNAVAILABLE
+        },
+        Err(e) => {
+            error!("Failed to obtain information about gist {}: {}", gist.uri, e);
+            exitcode::EX_UNKNOWN
         },
     }
 }

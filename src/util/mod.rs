@@ -73,6 +73,7 @@ pub mod exitcode {
     pub type ExitCode = i32;
 
     pub const EX_OK: ExitCode = 0;
+    pub const EX_UNKNOWN: ExitCode = 2;  // Conventional, not POSIX one.
     pub const EX_USAGE: ExitCode = 64;
     pub const EX_NOINPUT: ExitCode = 66;
     pub const EX_UNAVAILABLE: ExitCode = 69;

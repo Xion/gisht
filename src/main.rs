@@ -86,7 +86,7 @@ lazy_static! {
 lazy_static! {
     /// Main application's directory.
     static ref APP_DIR: PathBuf =
-        env::home_dir().unwrap_or_else(|| env::temp_dir()).join(".gisht");
+        env::home_dir().unwrap_or_else(|| env::temp_dir()).join(&format!(".{}", *NAME));
     // TODO: use the app_dirs crate to get this in a more portable way
 
     /// Directory where gist sources are stored.
@@ -161,7 +161,7 @@ fn ensure_app_dir(opts: &Options) -> Result<(), ExitCode> {
         let should_continue = display_warning().unwrap();
         if !should_continue {
             debug!("Warning not acknowledged -- exiting.");
-            return Err(2);
+            return Err(exitcode::EX_UNKNOWN);
         }
         trace!("Warning acknowledged.");
     } else {
