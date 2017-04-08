@@ -26,7 +26,7 @@
 
 // `slog` must precede `log` in declarations here, because we want to simultaneously:
 // * use the standard `log` macros (at least for a while)
-// * be able to initiaize the slog logger using slog macros like o!()
+// * be able to initialize the slog logger using slog macros like o!()
 #[macro_use] extern crate slog;
 #[macro_use] extern crate log;
 // TODO: when migrating to slog completely, `log` can be removed and order restored
@@ -61,7 +61,7 @@ use args::{ArgsError, Command, GistArg, Locality, Options};
 use commands::{run_gist, print_binary_path, print_gist, open_gist, show_gist_info};
 use gist::Gist;
 use hosts::FetchMode;
-use util::exitcode;
+use util::exitcode::{self, ExitCode};
 
 
 lazy_static! {
@@ -115,16 +115,17 @@ fn main() {
         VERSION.map(|v| format!("v{}", v)).unwrap_or_else(|| "<UNKNOWN VERSION>".into()),
         REVISION.map(|r| format!(" ({})", r)).unwrap_or_else(|| "".into()));
 
-    ensure_app_dir(&opts);
+    ensure_app_dir(&opts).unwrap_or_else(|e| exit(e));
 
-    let gist = decode_gist(&opts);
-    match opts.command {
+    let gist = decode_gist(&opts).unwrap_or_else(|e| exit(e));
+    let exitcode = match opts.command {
         Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
         Command::Which => print_binary_path(&gist),
         Command::Print => print_gist(&gist),
         Command::Open => open_gist(&gist),
         Command::Info => show_gist_info(&gist),
-    }
+    };
+    exit(exitcode)
 }
 
 /// Print an error that may occur while parsing arguments.
@@ -147,11 +148,11 @@ fn print_args_error(e: ArgsError) {
 
 /// Ensure that application directory exists.
 /// If it needs to be created, this will be treated as application's first run.
-fn ensure_app_dir(opts: &Options) {
+fn ensure_app_dir(opts: &Options) -> Result<(), ExitCode> {
     if APP_DIR.exists() {
         trace!("Application directory ({}) already exists, skipping creation.",
             APP_DIR.display());
-        return;
+        return Ok(());
     }
 
     // If the first run is interactive, display a warning about executing untrusted code.
@@ -160,7 +161,7 @@ fn ensure_app_dir(opts: &Options) {
         let should_continue = display_warning();
         if !should_continue {
             debug!("Warning not acknowledged -- exiting.");
-            exit(2);
+            return Err(2);
         }
         trace!("Warning acknowledged.");
     } else {
@@ -171,15 +172,17 @@ fn ensure_app_dir(opts: &Options) {
     if let Err(err) = fs::create_dir_all(&*APP_DIR) {
         error!("Failed to create application directory ({}): {}",
             APP_DIR.display(), err);
-        exit(exitcode::EX_OSFILE);
+        return Err(exitcode::EX_OSFILE);
     }
     debug!("Application directory ({}) created successfully.", APP_DIR.display());
+    Ok(())
 }
 
 
 /// Use command line arguments to obtain a Gist object.
 /// This may include fetching a fresh gist from a host, or updating it.
-fn decode_gist(opts: &Options) -> Gist {
+/// If an error occurred, returns the corresponding exit code.
+fn decode_gist(opts: &Options) -> Result<Gist, ExitCode> {
     let gist = match opts.gist {
         GistArg::Uri(ref uri) => {
             debug!("Gist {} specified as the argument", uri);
@@ -188,10 +191,12 @@ fn decode_gist(opts: &Options) -> Gist {
         GistArg::BrowserUrl(ref url) => {
             debug!("Gist URL `{}` specified as the argument", url);
             let url = url.as_str();
-            gist_from_url(url).unwrap_or_else(|| {
+            let maybe_gist = try!(gist_from_url(url));
+            let gist = try!(maybe_gist.ok_or_else(|| {
                 error!("URL doesn't point to any gist service: {}", url);
-                exit(exitcode::EX_UNAVAILABLE);
-            })
+                exitcode::EX_UNAVAILABLE
+            }));
+            gist
         },
     };
 
@@ -210,38 +215,38 @@ fn decode_gist(opts: &Options) -> Gist {
             let fetch_mode = if is_local { FetchMode::Auto } else { FetchMode::New };
             if let Err(err) = gist.uri.host().fetch_gist(&gist, fetch_mode) {
                 error!("Failed to download/update gist {}: {}", gist.uri, err);
-                exit(exitcode::EX_IOERR);
+                return Err(exitcode::EX_IOERR);
             }
         },
         Some(Locality::Local) => {
             if !is_local {
                 error!("Gist {} is not available locally -- exiting.", gist.uri);
-                exit(exitcode::EX_NOINPUT);
+                return Err(exitcode::EX_NOINPUT);
             }
         },
         Some(Locality::Remote) => {
             debug!("Forcing update of gist {}...", gist.uri);
             if let Err(err) = gist.uri.host().fetch_gist(&gist, FetchMode::Always) {
                 error!("Failed to update gist {}: {}", gist.uri, err);
-                exit(exitcode::EX_IOERR);
+                return Err(exitcode::EX_IOERR);
             }
         },
     }
 
-    gist
+    Ok(gist)
 }
 
 /// Ask each of the known gist hosts if they can resolve this URL into a gist.
-fn gist_from_url(url: &str) -> Option<Gist> {
+fn gist_from_url(url: &str) -> Result<Option<Gist>, ExitCode> {
     let mut gists = Vec::new();
 
     for (id, host) in &*hosts::HOSTS {
         if let Some(res) = host.resolve_url(url) {
-            let gist = res.unwrap_or_else(|err| {
+            let gist = try!(res.map_err(|err| {
                 error!("Error asking {} to resolve gist from URL `{}`: {}",
                     host.name(), url, err);
-                exit(exitcode::EX_IOERR);
-            });
+                exitcode::EX_IOERR
+            }));
             trace!("URL `{}` identified as `{}` ({}) gist", url, id, host.name());
             gists.push(gist);
         }
@@ -255,10 +260,10 @@ fn gist_from_url(url: &str) -> Option<Gist> {
             format!("{} ({})", host.name(), host.id())
         }).collect::<Vec<_>>().join(", ");
         error!("Multiple matching hosts for URL `{}`: {}", url, hosts_csv);
-        exit(exitcode::EX_CONFIG);
+        return Err(exitcode::EX_CONFIG);
     }
 
-    gists.pop()
+    Ok(gists.pop())
 }
 
 

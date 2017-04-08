@@ -93,6 +93,8 @@ fn get_matches_with_completion<'a, 'p, I, T>(parser: Parser<'p>, argv: I) -> cla
         trace!("Printing autocompletion script for {}...", shell);
         create_full_parser().gen_completions_to(*NAME, shell, &mut io::stdout());
         debug!("Autocompletion script for {} printed successuflly", shell);
+        // TODO: consider eliminating this exit(), most likely by converting
+        // clap::Result into Result<ArgsError> with a new ArgsError variant
         exit(0);
     }
 

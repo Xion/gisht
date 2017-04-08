@@ -5,13 +5,13 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
-use std::process::{Command, exit};
+use std::process::Command;
 
 use shlex;
 use webbrowser;
 
 use gist::Gist;
-use util::exitcode;
+use util::exitcode::{self, ExitCode};
 
 
 // TODO: make the functions here return the exitcode rather than
@@ -21,8 +21,10 @@ use util::exitcode;
 // Running gists.
 
 /// Run the specified gist.
-/// Regardless whether or not it succeeds, this function does not return.
-pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
+/// If this function succeeds, it may not return (because the process will be
+/// completely replaced by the gist binary)/
+/// Otherwise, an exit code is returned.
+pub fn run_gist(gist: &Gist, args: &[String]) -> ExitCode {
     let uri = gist.uri.clone();
     let binary = gist.binary_path();
     debug!("Running gist {} ({})...", uri, binary.display());
@@ -56,7 +58,7 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
             }
         }
         error!("Failed to execute gist {}: {}", uri, error);
-        exit(1);
+        1
     } else {
         let mut run = command.spawn()
             .unwrap_or_else(|e| panic!("Failed to execute gist {}: {}", uri, e));
@@ -65,8 +67,7 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ! {
         let exit_status = run.wait().unwrap_or_else(|e| {
             panic!("Failed to obtain status code for gist {}: {}", uri, e)
         });
-        let exit_code = exit_status.code().unwrap_or(exitcode::EX_TEMPFAIL);
-        exit(exit_code);
+        exit_status.code().unwrap_or(exitcode::EX_TEMPFAIL)
     }
 }
 
@@ -250,15 +251,15 @@ lazy_static! {
 
 
 /// Output the gist's binary path.
-pub fn print_binary_path(gist: &Gist) -> ! {
+pub fn print_binary_path(gist: &Gist) -> ExitCode {
     trace!("Printing binary path of {:?}", gist);
     println!("{}", gist.binary_path().display());
-    exit(exitcode::EX_OK);
+    exitcode::EX_OK
 }
 
 
 /// Print the source of the gist's binary.
-pub fn print_gist(gist: &Gist) -> ! {
+pub fn print_gist(gist: &Gist) -> ExitCode {
     trace!("Printing source code of {:?}", gist);
     let mut binary = fs::File::open(gist.binary_path()).unwrap_or_else(|e| {
         panic!("Failed to open the binary of gist {}: {}", gist.uri, e)
@@ -275,12 +276,12 @@ pub fn print_gist(gist: &Gist) -> ! {
         }
         if c < BUF_SIZE { break }
     }
-    exit(exitcode::EX_OK);
+    exitcode::EX_OK
 }
 
 
 /// Open the gist's HTML page in the default system browser.
-pub fn open_gist(gist: &Gist) -> ! {
+pub fn open_gist(gist: &Gist) -> ExitCode {
     let url = gist.uri.host().gist_url(gist).unwrap_or_else(|e| {
         panic!("Failed to determine the URL of gist {}: {}", gist.uri, e)
     });
@@ -288,12 +289,12 @@ pub fn open_gist(gist: &Gist) -> ! {
         panic!("Failed to open the URL of gist {} ({}) in the browser: {}",
             gist.uri, url, e)
     });
-    exit(exitcode::EX_OK)
+    exitcode::EX_OK
 }
 
 
 /// Show summary information about the gist.
-pub fn show_gist_info(gist: &Gist) -> ! {
+pub fn show_gist_info(gist: &Gist) -> ExitCode {
     trace!("Obtaining information on {:?}", gist);
     let maybe_info = gist.uri.host().gist_info(gist).unwrap_or_else(|e| {
         panic!("Failed to obtain information about gist {}: {}", gist.uri, e);
@@ -302,13 +303,13 @@ pub fn show_gist_info(gist: &Gist) -> ! {
         Some(info) => {
             debug!("Successfully obtained information on {:?}", gist);
             print!("{}", info);
-            exit(exitcode::EX_OK);
+            exitcode::EX_OK
         },
         None => {
             warn!("No information available about gist {}", gist.uri);
-            exit(exitcode::EX_UNAVAILABLE);
+            exitcode::EX_UNAVAILABLE
         },
-    };
+    }
 }
 
 
@@ -396,6 +397,8 @@ mod tests {
             assert_eq!(None, guess(""));
             assert_eq!(None, guess("GNU/Ruby#.NET"));
             assert_eq!(Some("python ${script} - ${args}"), guess("Python"));
+            // File extension also works as a "language".
+            assert_eq!(Some("python ${script} - ${args}"), guess("py"));
         }
 
         #[test]
