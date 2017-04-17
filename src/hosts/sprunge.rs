@@ -104,7 +104,10 @@ mod internal {
 
 #[cfg(test)]
 mod tests {
-    use super::Sprunge;
+    use gist::{self, Gist};
+    use hosts::Host;
+    use testing::InMemoryHost;
+    use super::{ID, internal, Sprunge};
 
     #[test]
     fn html_url_regex() {
@@ -138,5 +141,55 @@ mod tests {
             assert!(!html_url_re.is_match(invalid_url),
                 "URL was incorrectly deemed a valid gist HTML URL: {}", invalid_url);
         }
+    }
+
+    #[test]
+    fn resolve_url_recognizes_language() {
+        let host = internal::Sprunge{inner: InMemoryHost::with_id(ID)};
+
+        let gist_id = "A46gBeV";
+        let lang = "py";
+        host.inner.put_gist_with_url(
+            Gist::new(gist::Uri::from_name(ID, gist_id).unwrap(), gist_id),
+            format!("http://sprunge.us/{}", gist_id));  // no language here
+
+        // Gist resolved against the URL with language should have the language
+        // in its info (but of course not in its ID).
+        let gist = host.resolve_url(
+            &format!("http://sprunge.us/{}?{}", gist_id, lang)).unwrap().unwrap();
+        assert_eq!(gist_id, gist.id.as_ref().unwrap());
+        assert_eq!(lang, gist.info(gist::Datum::Language).unwrap());
+    }
+
+    #[test]
+    fn resolve_url_errors_on_broken_url() {
+        let host = internal::Sprunge{inner: InMemoryHost::with_id(ID)};
+
+        let url = "http://sprunge.us/borked";
+        host.inner.put_broken_url(url);
+
+        let result = host.resolve_url(url).unwrap();
+        assert!(result.is_err(), "Resolving a broken URL unexpectedly succeeded");
+        let error_msg = format!("{}", result.unwrap_err());
+        assert!(error_msg.contains(url),
+            "Error message didn't contain the URL `{}`", url);
+    }
+
+    #[test]
+    fn gist_url_includes_language() {
+        let host = internal::Sprunge{inner: InMemoryHost::with_id(ID)};
+
+        // Add a gist with language.
+        let gist_id = "A46gBeV";
+        let lang = "py";
+        let gist = Gist::new(gist::Uri::from_name(ID, gist_id).unwrap(), gist_id)
+            .with_info(gist::InfoBuilder::new()
+                .with(gist::Datum::Language, lang)
+                .build());
+        host.inner.put_gist_with_url(gist.clone(), format!("http://sprunge.us/{}", gist_id));
+
+        // Gist URL should include the language in its query string.
+        let url = host.gist_url(&gist).unwrap();
+        assert_eq!(format!("http://sprunge.us/{}?{}", gist_id, lang), url);
     }
 }
