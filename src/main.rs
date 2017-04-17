@@ -87,7 +87,7 @@ lazy_static! {
 lazy_static! {
     /// Main application's directory.
     static ref APP_DIR: PathBuf =
-        env::home_dir().unwrap_or_else(|| env::temp_dir()).join(&format!(".{}", *NAME));
+        env::home_dir().unwrap_or_else(env::temp_dir).join(&format!(".{}", *NAME));
     // TODO: use the app_dirs crate to get this in a more portable way
 
     /// Directory where gist sources are stored.

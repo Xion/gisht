@@ -219,7 +219,7 @@ impl FromStr for GistArg {
 }
 
 custom_derive! {
-    /// Erorr that can occur while parsing of the GIST argument.
+    /// Error that can occur while parsing of the GIST argument.
     #[derive(Debug, PartialEq,
              Error("gist argument error"), ErrorDisplay, ErrorFrom)]
     pub enum GistError {
