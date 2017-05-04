@@ -8,6 +8,7 @@ mod common;
 
 mod github;
 mod bpaste;
+mod dpaste_de;
 mod hastebin;
 mod heypasteit;
 mod lpaste;
@@ -106,6 +107,7 @@ lazy_static! {
         hastebin::ID => Arc::new(hastebin::Hastebin::new()) as Arc<Host>,
         mibpaste::ID => Arc::new(mibpaste::Mibpaste::new()) as Arc<Host>,
         sprunge::ID => Arc::new(sprunge::Sprunge::new()) as Arc<Host>,
+        dpaste_de::ID => Arc::new(dpaste_de::create()) as Arc<Host>,
     };
 }
 #[cfg(not(test))]
