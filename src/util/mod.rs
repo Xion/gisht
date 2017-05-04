@@ -4,6 +4,10 @@ use std::fs;
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 
+use hyper::client::Client;
+use hyper::net::HttpsConnector;
+use hyper_native_tls::NativeTlsClient;
+
 
 /// Like try!(), but returns Some(Err(err)) in case of error.
 /// Compatible with functions returning Option<Result<T, E>>.
@@ -85,6 +89,14 @@ pub fn read_lines<P: AsRef<Path>>(path: P) -> io::Result<Vec<String>> {
 
     debug!("Read {} lines(s) ({} byte(s)) from {}", line_count, byte_count, path.display());
     Ok(result)
+}
+
+
+/// Create a TLS-capable HTTP Hyper client.
+pub fn http_client() -> Client {
+    let ssl = NativeTlsClient::new().unwrap();
+    let connector = HttpsConnector::new(ssl);
+    Client::with_connector(connector)
 }
 
 

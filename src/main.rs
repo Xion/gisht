@@ -11,6 +11,7 @@
              extern crate git2;
              extern crate htmlescape;
              extern crate hyper;
+             extern crate hyper_native_tls;
              extern crate isatty;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate maplit;

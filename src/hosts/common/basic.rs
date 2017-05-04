@@ -6,7 +6,7 @@ use std::fs;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::Path;
 
-use hyper::client::{Client, Response};
+use hyper::client::Response;
 use hyper::header::UserAgent;
 use regex::{self, Regex};
 use url::Url;
@@ -14,7 +14,7 @@ use url::Url;
 use ::USER_AGENT;
 use gist::{self, Gist};
 use hosts::{FetchMode, Host};
-use util::{LINESEP, mark_executable, symlink_file};
+use util::{LINESEP, mark_executable, symlink_file, http_client};
 
 
 /// Placeholder for gist IDs in URL patterns.
@@ -194,7 +194,7 @@ impl Basic {
 
     /// Download given gist.
     fn download_gist<'g>(&self, gist: &'g Gist) -> io::Result<&'g Gist> {
-        let http = Client::new();
+        let http = http_client();
 
         // Download the gist using the raw URL pattern.
         let url = self.raw_url_pattern.replace(ID_PLACEHOLDER, gist.id.as_ref().unwrap());

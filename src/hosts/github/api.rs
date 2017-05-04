@@ -13,6 +13,7 @@ use url::Url;
 use ::USER_AGENT;
 use ext::hyper::header::Link;
 use gist::{self, Datum, Gist};
+use util::http_client;
 use super::ID;
 use super::util::read_json;
 
@@ -67,7 +68,7 @@ impl<'o> GistsIterator<'o> {
             gists_url: Some(gists_url),
             gists_json_array: None,
             index: 0,
-            http: Client::new(),
+            http: http_client(),
         }
     }
 }
@@ -294,7 +295,7 @@ fn gist_filenames_from_info(info: &Json) -> Option<Vec<&str>> {
 /// Make a simple GET request to GitHub API.
 fn simple_get(url: Url) -> io::Result<Response> {
     let url = url.into_string();
-    let http = Client::new();
+    let http = http_client();
     http.get(&url)
         .header(UserAgent(USER_AGENT.clone()))
         .send()
