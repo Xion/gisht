@@ -17,6 +17,7 @@ mod mozilla;
 mod paste;
 mod pastebin;
 mod sprunge;
+mod thepasteb_in;
 
 
 use std::collections::HashMap;
@@ -108,6 +109,7 @@ lazy_static! {
         mibpaste::ID => Arc::new(mibpaste::Mibpaste::new()) as Arc<Host>,
         sprunge::ID => Arc::new(sprunge::Sprunge::new()) as Arc<Host>,
         dpaste_de::ID => Arc::new(dpaste_de::create()) as Arc<Host>,
+        thepasteb_in::ID => Arc::new(thepasteb_in::create()) as Arc<Host>,
     };
 }
 #[cfg(not(test))]
