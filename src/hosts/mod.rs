@@ -11,6 +11,7 @@ mod bpaste;
 mod dpaste_de;
 mod hastebin;
 mod heypasteit;
+mod ix_io;
 mod lpaste;
 mod mibpaste;
 mod mozilla;
@@ -110,6 +111,7 @@ lazy_static! {
         sprunge::ID => Arc::new(sprunge::Sprunge::new()) as Arc<Host>,
         dpaste_de::ID => Arc::new(dpaste_de::create()) as Arc<Host>,
         thepasteb_in::ID => Arc::new(thepasteb_in::create()) as Arc<Host>,
+        ix_io::ID => Arc::new(ix_io::Ix::new()) as Arc<Host>,
     };
 }
 #[cfg(not(test))]

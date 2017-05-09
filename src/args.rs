@@ -55,9 +55,11 @@ pub fn parse_from_argv<I, T>(argv: I) -> Result<Options, ArgsError>
                 },
             }
         } else {
-            // If help was requested, use the full parser (with subcommands).
-            // This ensure the correct help/usage instructions are shown.
+            // If help was requested, use the full parser (with subcommands,
+            // though make them optional to account for the hack above).
+            // Al this ensures the correct help/usage instructions are shown.
             create_full_parser()
+                .unset_setting(AppSettings::SubcommandRequiredElseHelp)
         }
     };
 

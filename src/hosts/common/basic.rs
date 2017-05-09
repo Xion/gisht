@@ -152,10 +152,12 @@ impl Host for Basic {
         let url = self.sanitize_url(url);
 
         // Check if it matches the pattern of gist's page URLs.
+        trace!("Matching sanitized URL {} against the regex: {}",
+            url, self.html_url_re.as_str());
         let captures = match self.html_url_re.captures(&*url) {
             Some(c) => c,
             None => {
-                debug!("URL {} doesn't point to a {} gist", self.name, orig_url);
+                debug!("URL {} doesn't point to a {} gist", orig_url, self.name);
                 return None;
             },
         };
@@ -232,7 +234,7 @@ impl Basic {
 // Resolving gist URLs.
 impl Basic {
     fn sanitize_url<'u>(&self, url: &'u str) -> Cow<'u, str> {
-        let mut url = Cow::Borrowed(url.trim().trim_right_matches("/"));
+        let mut url = Cow::Borrowed(url.trim());
 
         // Convert between HTTPS and HTTP if necessary.
         let (canonical_proto, other_http_proto);
