@@ -55,7 +55,7 @@ mod internal {
 
             // Add language to the URL.
             if let Some(ref lang) = gist.info(gist::Datum::Language) {
-                url = format!("{}/{}", url.trim_right_matches("/"), lang);
+                url = format!("{}/{}/", url.trim_right_matches("/"), lang);
             }
             Ok(url)
         }
@@ -77,14 +77,19 @@ mod internal {
 
             // According to ix.io homepage, there are two ways the URL can
             // contain language information:
-            // * http://ix.io/$ID/$LANG
-            // * http://ix.io/$ID+$LANG
+            // * http://ix.io/$ID/$LANG/
+            // * http://ix.io/$ID+$LANG/
             // We need to count the number of path segments to see which case
             // it is (if any).
             let mut url: Cow<str> = url.into();
-            let path_segments: Vec<_> = url_obj.path_segments()
+            let mut path_segments: Vec<_> = url_obj.path_segments()
                 .map(|ps| ps.collect())
                 .unwrap_or_else(Vec::new);
+            if path_segments.last() == Some(&"") {
+                // URL had a trailing slash. That's expected, actually,
+                // but we don't want the empty path segment that follows it.
+                path_segments.pop();
+            }
             let ps_count = path_segments.len();
 
             // Determine the language from the path segment pattern,
@@ -139,5 +144,99 @@ mod internal {
 
             Some(Ok(gist))
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use gist::{self, Gist};
+    use hosts::Host;
+    use testing::InMemoryHost;
+    use super::{ID, internal, Ix};
+
+    #[test]
+    fn html_url_regex() {
+        let host = Ix::new();
+        let html_url: String = host.inner.html_url_origin();
+
+        let valid_html_urls: Vec<(/* URL */ String,
+                                  /* ID */ &'static str)> = vec![
+            (html_url.clone() + "/abc/", "abc"),                // short
+            (html_url.clone() + "/a1b2c3d4e5/", "a1b2c3d4e5"),  // long
+            (html_url.clone() + "/43ffg/", "43ffg"),            // starts with digit
+            (html_url.clone() + "/46417247/", "46417247"),      // only digits
+        ];
+        let invalid_html_urls: Vec<String> = vec![
+            html_url.clone() + "/a/b/c",            // too many path segments
+            html_url.clone() + "/a",                // no trailing slash
+            html_url.clone() + "//",                // ID must not be empty
+            html_url.clone() + "/",                 // no ID at all
+            html_url.clone() + "/MfgT45f/",         // mixed case
+            "http://example.com/fhdFG36ok/".into(), // wrong ix.io domain
+            "foobar".into(),                        // not even an URL
+        ];
+
+        let html_url_re = host.inner.html_url_regex();
+        for (ref valid_url, id) in valid_html_urls {
+            let captures = html_url_re.captures(valid_url)
+                .expect(&format!("Paste's HTML URL was incorrectly deemed invalid: {}", valid_url));
+            assert_eq!(id, captures.name("id").unwrap());
+        }
+        for ref invalid_url in invalid_html_urls {
+            assert!(!html_url_re.is_match(invalid_url),
+                "URL was incorrectly deemed a valid gist HTML URL: {}", invalid_url);
+        }
+    }
+
+    #[test]
+    fn resolve_url_recognizes_language() {
+        let host = internal::Ix{inner: InMemoryHost::with_id(ID)};
+
+        let gist_id = "tea";
+        let lang = "bash";
+        host.inner.put_gist_with_url(
+            Gist::new(gist::Uri::from_name(ID, gist_id).unwrap(), gist_id),
+            format!("http://ix.io/{}/", gist_id));
+
+        // Gist resolved against a URL with language should have the language
+        // in its info (but of course not in its ID).
+        let gist = host.resolve_url(
+            &format!("http://ix.io/{}/{}/", gist_id, lang)).unwrap().unwrap();
+        assert_eq!(Some(gist_id), gist.id.as_ref().map(String::as_str));
+        assert_eq!(Some(lang),
+            gist.info(gist::Datum::Language).as_ref().map(String::as_str));
+    }
+
+    #[test]
+    fn resolve_url_errors_on_broken_url() {
+        let host = internal::Ix{inner: InMemoryHost::with_id(ID)};
+
+        let url = "http://ix.io/borked/";
+        host.inner.put_broken_url(url);
+
+        let result = host.resolve_url(url).unwrap();
+        assert!(result.is_err(), "Resolving a broken URL unexpectedly succeeded");
+        let error_msg = format!("{}", result.unwrap_err());
+        assert!(error_msg.contains(url),
+            "Error message didn't contain the URL `{}`", url);
+    }
+
+    #[test]
+    fn gist_url_includes_language() {
+        let host = internal::Ix{inner: InMemoryHost::with_id(ID)};
+
+        // Add a gist with language.
+        let gist_id = "tea";
+        let lang = "bash";
+        let gist = Gist::new(gist::Uri::from_name(ID, gist_id).unwrap(), gist_id)
+            .with_info(gist::InfoBuilder::new()
+                .with(gist::Datum::Language, lang)
+                .build());
+        host.inner.put_gist_with_url(gist.clone(), format!("http://ix.io/{}/", gist_id));
+
+        // Gist URL should include the language in the path.
+        let url = host.gist_url(&gist).unwrap();
+        assert_eq!(format!("http://ix.io/{}/{}/", gist_id, lang), url);
     }
 }
