@@ -15,7 +15,7 @@ mod ix_io;
 mod lpaste;
 mod mibpaste;
 mod mozilla;
-mod paste;
+mod paste_rs;
 mod pastebin;
 mod sprunge;
 mod thepasteb_in;
@@ -105,7 +105,7 @@ lazy_static! {
         heypasteit::ID => Arc::new(heypasteit::create()) as Arc<Host>,
         bpaste::ID => Arc::new(bpaste::create()) as Arc<Host>,
         mozilla::ID => Arc::new(mozilla::create()) as Arc<Host>,
-        paste::ID => Arc::new(paste::create()) as Arc<Host>,
+        paste_rs::ID => Arc::new(paste_rs::create()) as Arc<Host>,
         hastebin::ID => Arc::new(hastebin::Hastebin::new()) as Arc<Host>,
         mibpaste::ID => Arc::new(mibpaste::Mibpaste::new()) as Arc<Host>,
         sprunge::ID => Arc::new(sprunge::Sprunge::new()) as Arc<Host>,
