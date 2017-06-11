@@ -10,6 +10,7 @@ use std::str::FromStr;
 use clap::{self, AppSettings, Arg, ArgMatches, ArgSettings, Shell, SubCommand};
 use conv::TryFrom;
 use conv::errors::Unrepresentable;
+use exitcode;
 use url;
 
 use super::{gist, NAME, VERSION};
@@ -97,7 +98,7 @@ fn get_matches_with_completion<'a, 'p, I, T>(parser: Parser<'p>, argv: I) -> cla
         debug!("Autocompletion script for {} printed successuflly", shell);
         // TODO: consider eliminating this exit(), most likely by converting
         // clap::Result into Result<ArgsError> with a new ArgsError variant
-        exit(0);
+        exit(exitcode::OK);
     }
 
     Ok(matches)

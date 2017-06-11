@@ -8,6 +8,7 @@
 #[macro_use] extern crate custom_derive;
 #[macro_use] extern crate enum_derive;
 #[macro_use] extern crate error_derive;
+             extern crate exitcode;
              extern crate git2;
              extern crate htmlescape;
              extern crate hyper;
@@ -58,12 +59,12 @@ use std::path::PathBuf;
 use std::process::exit;
 
 use ansi_term::{Colour, Style};
+use exitcode::ExitCode;
 
 use args::{ArgsError, Command, GistArg, Locality, Options};
 use commands::{run_gist, print_binary_path, print_gist, open_gist, show_gist_info};
 use gist::Gist;
 use hosts::FetchMode;
-use util::exitcode::{self, ExitCode};
 
 
 lazy_static! {
@@ -109,7 +110,7 @@ lazy_static! {
 fn main() {
     let opts = args::parse().unwrap_or_else(|e| {
         print_args_error(e).unwrap();
-        exit(exitcode::EX_USAGE);
+        exit(exitcode::USAGE);
     });
 
     logging::init(opts.verbosity).unwrap();
@@ -120,14 +121,14 @@ fn main() {
     ensure_app_dir(&opts).unwrap_or_else(|e| exit(e));
 
     let gist = decode_gist(&opts).unwrap_or_else(|e| exit(e));
-    let exitcode = match opts.command {
+    let exit_code = match opts.command {
         Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
         Command::Which => print_binary_path(&gist),
         Command::Print => print_gist(&gist),
         Command::Open => open_gist(&gist),
         Command::Info => show_gist_info(&gist),
     };
-    exit(exitcode)
+    exit(exit_code)
 }
 
 /// Print an error that may occur while parsing arguments.
@@ -163,7 +164,7 @@ fn ensure_app_dir(opts: &Options) -> Result<(), ExitCode> {
         let should_continue = display_warning().unwrap();
         if !should_continue {
             debug!("Warning not acknowledged -- exiting.");
-            return Err(exitcode::EX_UNKNOWN);
+            return Err(exitcode::TEMPFAIL);
         }
         trace!("Warning acknowledged.");
     } else {
@@ -174,7 +175,7 @@ fn ensure_app_dir(opts: &Options) -> Result<(), ExitCode> {
     if let Err(err) = fs::create_dir_all(&*APP_DIR) {
         error!("Failed to create application directory ({}): {}",
             APP_DIR.display(), err);
-        return Err(exitcode::EX_OSFILE);
+        return Err(exitcode::OSFILE);
     }
     debug!("Application directory ({}) created successfully.", APP_DIR.display());
     Ok(())
@@ -196,7 +197,7 @@ fn decode_gist(opts: &Options) -> Result<Gist, ExitCode> {
             let maybe_gist = try!(gist_from_url(url));
             let gist = try!(maybe_gist.ok_or_else(|| {
                 error!("URL doesn't point to any gist service: {}", url);
-                exitcode::EX_UNAVAILABLE
+                exitcode::UNAVAILABLE
             }));
             gist
         },
@@ -217,20 +218,20 @@ fn decode_gist(opts: &Options) -> Result<Gist, ExitCode> {
             let fetch_mode = if is_local { FetchMode::Auto } else { FetchMode::New };
             if let Err(err) = gist.uri.host().fetch_gist(&gist, fetch_mode) {
                 error!("Failed to download/update gist {}: {}", gist.uri, err);
-                return Err(exitcode::EX_IOERR);
+                return Err(exitcode::IOERR);
             }
         },
         Some(Locality::Local) => {
             if !is_local {
                 error!("Gist {} is not available locally -- exiting.", gist.uri);
-                return Err(exitcode::EX_NOINPUT);
+                return Err(exitcode::NOINPUT);
             }
         },
         Some(Locality::Remote) => {
             debug!("Forcing update of gist {}...", gist.uri);
             if let Err(err) = gist.uri.host().fetch_gist(&gist, FetchMode::Always) {
                 error!("Failed to update gist {}: {}", gist.uri, err);
-                return Err(exitcode::EX_IOERR);
+                return Err(exitcode::IOERR);
             }
         },
     }
@@ -247,7 +248,7 @@ fn gist_from_url(url: &str) -> Result<Option<Gist>, ExitCode> {
             let gist = try!(res.map_err(|err| {
                 error!("Error asking {} to resolve gist from URL `{}`: {}",
                     host.name(), url, err);
-                exitcode::EX_IOERR
+                exitcode::IOERR
             }));
             trace!("URL `{}` identified as `{}` ({}) gist", url, id, host.name());
             gists.push(gist);
@@ -262,7 +263,7 @@ fn gist_from_url(url: &str) -> Result<Option<Gist>, ExitCode> {
             format!("{} ({})", host.name(), host.id())
         }).collect::<Vec<_>>().join(", ");
         error!("Multiple matching hosts for URL `{}`: {}", url, hosts_csv);
-        return Err(exitcode::EX_CONFIG);
+        return Err(exitcode::CONFIG);
     }
 
     Ok(gists.pop())

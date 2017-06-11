@@ -8,10 +8,10 @@ use std::path::Path;
 use std::process::Command;
 
 use shlex;
+use exitcode::{self, ExitCode};
 use webbrowser;
 
 use gist::Gist;
-use util::exitcode::{self, ExitCode};
 
 
 /// Run the specified gist.
@@ -54,13 +54,13 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ExitCode {
             }
         }
         error!("Failed to execute gist {}: {}", uri, error);
-        exitcode::EX_UNKNOWN
+        exitcode::UNAVAILABLE
     } else {
         let mut run = match command.spawn() {
             Ok(r) => r,
             Err(e) => {
                 error!("Failed to execute gist {}: {}", uri, e);
-                return exitcode::EX_TEMPFAIL;
+                return exitcode::TEMPFAIL;
             }
         };
 
@@ -69,10 +69,10 @@ pub fn run_gist(gist: &Gist, args: &[String]) -> ExitCode {
             Ok(es) => es,
             Err(e) => {
                 error!("Failed to obtain status code for gist {}: {}", uri, e);
-                return exitcode::EX_TEMPFAIL;
+                return exitcode::TEMPFAIL;
             },
         };
-        exit_status.code().unwrap_or(exitcode::EX_TEMPFAIL)
+        exit_status.code().unwrap_or(exitcode::UNAVAILABLE)
     }
 }
 
@@ -269,7 +269,7 @@ lazy_static! {
 pub fn print_binary_path(gist: &Gist) -> ExitCode {
     trace!("Printing binary path of {:?}", gist);
     println!("{}", gist.binary_path().display());
-    exitcode::EX_OK
+    exitcode::OK
 }
 
 
@@ -280,7 +280,7 @@ pub fn print_gist(gist: &Gist) -> ExitCode {
         Ok(file) => file,
         Err(e) => {
             error!("Failed to open the binary of gist {}: {}", gist.uri, e);
-            return exitcode::EX_IOERR;
+            return exitcode::IOERR;
         },
     };
 
@@ -291,18 +291,18 @@ pub fn print_gist(gist: &Gist) -> ExitCode {
             Ok(c) => c,
             Err(e) => {
                 error!("Failed to read the binary of gist {}: {}", gist.uri, e);
-                return exitcode::EX_IOERR;
+                return exitcode::IOERR;
             },
         };
         if c > 0 {
             if let Err(e) = io::stdout().write_all(&buf[0..c]) {
                 error!("Failed to write the gist {} to stdout: {}", gist.uri, e);
-                return exitcode::EX_IOERR;
+                return exitcode::IOERR;
             }
         }
         if c < BUF_SIZE { break }
     }
-    exitcode::EX_OK
+    exitcode::OK
 }
 
 
@@ -312,15 +312,15 @@ pub fn open_gist(gist: &Gist) -> ExitCode {
         Ok(url) => url,
         Err(e) => {
             error!("Failed to determine the URL of gist {}: {}", gist.uri, e);
-            return exitcode::EX_UNAVAILABLE;
+            return exitcode::UNAVAILABLE;
         },
     };
     if let Err(e) = webbrowser::open(&url) {
         error!("Failed to open the URL of gist {} ({}) in the browser: {}",
             gist.uri, url, e);
-        return exitcode::EX_UNKNOWN;
+        return exitcode::UNAVAILABLE;
     };
-    exitcode::EX_OK
+    exitcode::OK
 }
 
 
@@ -332,15 +332,15 @@ pub fn show_gist_info(gist: &Gist) -> ExitCode {
             debug!("Successfully obtained {} piece(s) of information on {:?}",
                 info.len(), gist);
             print!("{}", info);
-            exitcode::EX_OK
+            exitcode::OK
         },
         Ok(None) => {
             warn!("No information available about {:?}", gist);
-            exitcode::EX_UNAVAILABLE
+            exitcode::UNAVAILABLE
         },
         Err(e) => {
             error!("Failed to obtain information about {:?}: {}", gist, e);
-            exitcode::EX_UNKNOWN
+            exitcode::UNAVAILABLE
         },
     }
 }

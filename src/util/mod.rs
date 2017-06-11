@@ -98,21 +98,3 @@ pub fn http_client() -> Client {
     let connector = HttpsConnector::new(ssl);
     Client::with_connector(connector)
 }
-
-
-// Module defining standard exit codes that are normally found in POSIX header files.
-pub mod exitcode {
-    /// Type of the exit codes.
-    /// This should be the same as the argument type of std::process::exit.
-    pub type ExitCode = i32;
-
-    pub const EX_OK: ExitCode = 0;
-    pub const EX_UNKNOWN: ExitCode = 2;  // Conventional, not POSIX one.
-    pub const EX_USAGE: ExitCode = 64;
-    pub const EX_NOINPUT: ExitCode = 66;
-    pub const EX_UNAVAILABLE: ExitCode = 69;
-    pub const EX_OSFILE: ExitCode = 72;
-    pub const EX_IOERR: ExitCode = 74;
-    pub const EX_TEMPFAIL: ExitCode = 75;
-    pub const EX_CONFIG: ExitCode = 78;
-}

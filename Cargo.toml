@@ -17,6 +17,9 @@ conv = "0.3"
 custom_derive = "*"
 enum_derive = "*"
 error_derive = "*"
+# TODO: switch back to crates.io when/if the PR is accepted and published:
+# https://github.com/benwilber/exitcode/pull/7
+exitcode = { git = "https://github.com/Xion/exitcode", branch = "type_alias" }
 git2 = "0.6.4"
 htmlescape = "0.3.1"
 hyper = "0.10"
