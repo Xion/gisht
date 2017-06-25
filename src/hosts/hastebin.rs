@@ -44,7 +44,7 @@ mod internal {
     /// Actual implementation type for Hastebin,
     /// taking a generic parameter so it can be substituted in tests.
     pub struct Hastebin<T: Host> {
-        pub inner: T,
+        pub(super) inner: T,
     }
 
     impl<T: Host> Host for Hastebin<T> {

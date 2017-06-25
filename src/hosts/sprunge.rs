@@ -39,7 +39,7 @@ mod internal {
     /// Actual implementation type for sprunge.us,
     /// taking a generic parameter so it can be substituted in tests.
     pub struct Sprunge<T: Host> {
-        pub inner: T,
+        pub(super) inner: T,
     }
 
     impl<T: Host> Host for Sprunge<T> {

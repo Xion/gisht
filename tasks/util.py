@@ -20,7 +20,7 @@ __all__ = ['ensure_rustc_version',
            'read_cargo_toml']
 
 
-MIN_RUSTC_VERSION = '1.12.0'
+MIN_RUSTC_VERSION = '1.18.0'
 
 
 def ensure_rustc_version(ctx):

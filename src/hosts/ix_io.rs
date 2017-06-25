@@ -38,7 +38,7 @@ mod internal {
     /// Actual implementation type for ix.io,
     /// taking a generic parameter so it can be substituted in tests.
     pub struct Ix<T: Host> {
-        pub inner: T,
+        pub(super) inner: T,
     }
 
     impl<T: Host> Host for Ix<T> {
