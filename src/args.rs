@@ -180,10 +180,10 @@ impl<'a> TryFrom<ArgMatches<'a>> for Options {
     }
 }
 
-custom_derive! {
+macro_attr! {
     /// Error that can occur while parsing of command line arguments.
     #[derive(Debug,
-             Error("command line arguments error"), ErrorDisplay, ErrorFrom)]
+             Error!("command line arguments error"), ErrorDisplay!, ErrorFrom!)]
     pub enum ArgsError {
         /// General when parsing the arguments.
         Parse(clap::Error),
@@ -221,10 +221,10 @@ impl FromStr for GistArg {
     }
 }
 
-custom_derive! {
+macro_attr! {
     /// Error that can occur while parsing of the GIST argument.
     #[derive(Debug, PartialEq,
-             Error("gist argument error"), ErrorDisplay, ErrorFrom)]
+             Error!("gist argument error"), ErrorDisplay!, ErrorFrom!)]
     pub enum GistError {
         /// Error while parsing gist URI.
         Uri(gist::UriError),
@@ -234,10 +234,10 @@ custom_derive! {
 }
 
 
-custom_derive! {
+macro_attr! {
     /// Enum describing gist "locality" options.
     #[derive(Clone, Debug, Eq, PartialEq, Hash,
-             IterVariants(Localities))]
+             IterVariants!(Localities))]
     pub enum Locality {
         /// Operate only on gists available locally
         /// (do not fetch anything from remote gist hosts).
@@ -248,10 +248,10 @@ custom_derive! {
 }
 
 
-custom_derive! {
+macro_attr! {
     /// Gist command issued to the application, along with its arguments.
     #[derive(Clone, Debug, Eq, PartialEq, Hash,
-             IterVariants(Commands))]
+             IterVariants!(Commands))]
     pub enum Command {
         /// Run the specified gist.
         Run,

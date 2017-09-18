@@ -5,10 +5,10 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 
-custom_derive! {
+macro_attr! {
     /// Enum listing all the recognized pieces of gist information.
     #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd,
-             IterVariants(Data))]
+             IterVariants!(Data))]
     pub enum Datum {
         /// Host-specific ID of the gist.
         Id,

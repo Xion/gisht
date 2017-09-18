@@ -5,7 +5,6 @@
              extern crate ansi_term;
              extern crate clap;
              extern crate conv;
-#[macro_use] extern crate custom_derive;
 #[macro_use] extern crate enum_derive;
 #[macro_use] extern crate error_derive;
              extern crate exitcode;
@@ -15,6 +14,7 @@
              extern crate hyper_native_tls;
              extern crate isatty;
 #[macro_use] extern crate lazy_static;
+#[macro_use] extern crate macro_attr;
 #[macro_use] extern crate maplit;
              extern crate regex;
              extern crate serde_json;
@@ -28,11 +28,10 @@
              extern crate webbrowser;
 
 // `slog` must precede `log` in declarations here, because we want to simultaneously:
-// * use the standard `log` macros (at least for a while)
+// * use the standard `log` macros
 // * be able to initialize the slog logger using slog macros like o!()
 #[macro_use] extern crate slog;
 #[macro_use] extern crate log;
-// TODO: when migrating to slog completely, `log` can be removed and order restored
 
 #[cfg(test)] extern crate tempfile;
 
