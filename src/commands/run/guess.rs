@@ -5,6 +5,8 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
+use itertools::Itertools;
+
 use gist::Gist;
 use super::interpreters::*;
 
@@ -37,8 +39,8 @@ fn guess_interpreter_for_filename<P: AsRef<Path>>(binary_path: P) -> Option<Inte
     let extension = try_opt!(extension.to_str());
     let interpreter = try_opt!(COMMON_INTERPRETERS.get(&extension));
     debug!("Guessed the interpreter for {} as `{}`",
-        binary_path.display(), interpreter.split_whitespace().next().unwrap());
-    Some(interpreter)
+        binary_path.display(), interpreter.binary());
+    Some(interpreter.clone())
 }
 
 
@@ -72,12 +74,19 @@ fn guess_interpreter_for_language(language: &str) -> Option<Interpreter> {
 
     let interpreter = try_opt!(COMMON_INTERPRETERS.get(&*extension));
     debug!("Guessed the interpreter for {} language as `{}`",
-        language, interpreter.split_whitespace().next().unwrap());
-    Some(interpreter)
+        language, interpreter.binary());
+    Some(interpreter.clone())
 }
 
 
 /// Guess an interpreter for a file based on its hashbang.
+///
+/// This is normally not necessary as the operating system should resolve
+/// the hashbang before we even start guessing (i.e. regular executable run).
+/// However, if the hashbang is not entirely correct but salvageable
+/// -- e.g. it says `/usr/bin/python` but the system's Python is somewhere else --
+/// we can try to repair it this way.
+///
 /// Returns the "format string" for the interpreter's command string.
 fn guess_interpreter_for_hashbang<P: AsRef<Path>>(binary_path: P) -> Option<Interpreter> {
     let binary_path = binary_path.as_ref();
@@ -102,14 +111,12 @@ fn guess_interpreter_for_hashbang<P: AsRef<Path>>(binary_path: P) -> Option<Inte
     // Check if a single known interpreter path starts with the program name,
     // or the entire hashbang path.
     let program = Path::new(hashbang_path).file_name().and_then(|n| n.to_str());
-    let program_prefix = program.map(|p| p.to_owned() + " ");
     let path_prefix = hashbang_path.to_owned() + " ";
     let mut interpreters = vec![];
-    for &cmdline in COMMON_INTERPRETERS.values() {
-        let starts_with_program = program_prefix.as_ref()
-            .map(|p| cmdline.starts_with(p)).unwrap_or(false);
-        if cmdline.starts_with(&path_prefix) || starts_with_program {
-            interpreters.push(cmdline);
+    for interp in COMMON_INTERPRETERS.values() {
+        let starts_with_program = program.map(|p| interp.binary() == p).unwrap_or(false);
+        if interp.command_line().starts_with(&path_prefix) || starts_with_program {
+            interpreters.push(interp.clone());
         }
     }
     match interpreters.len() {
@@ -118,14 +125,14 @@ fn guess_interpreter_for_hashbang<P: AsRef<Path>>(binary_path: P) -> Option<Inte
             None
         },
         1 => {
-            let result = interpreters[0];
+            let result = interpreters.into_iter().next().unwrap();
             debug!("Guessed the interpreter for hashbang #!{} as `{}`",
                 hashbang_path, result);
             Some(result)
         },
         _ => {
             debug!("Ambiguous hashbang #!{} resolves to multiple possible interpreters:\n{}",
-                hashbang_path, interpreters.join("\n"));
+                hashbang_path, interpreters.into_iter().format("\n"));
             None
         },
     }
@@ -140,20 +147,22 @@ mod tests {
 
     #[test]
     fn interpreter_for_filename() {
-        let guess = guess_interpreter_for_filename;
+        let guess = |f| guess_interpreter_for_filename(f)
+            .map(|i| i.command_line().to_owned());
         assert_eq!(None, guess("/foo/bar"));  // no extension
         assert_eq!(None, guess("/foo.lolwtf"));  // unknown extension
-        assert_eq!(Some("python ${script} - ${args}"), guess("/foo.py"));
+        assert_eq!(Some("python ${script} - ${args}".into()), guess("/foo.py"));
     }
 
     #[test]
     fn interpreter_for_language() {
-        let guess = guess_interpreter_for_language;
+        let guess = |l| guess_interpreter_for_language(l)
+            .map(|i| i.command_line().to_owned());
         assert_eq!(None, guess(""));
         assert_eq!(None, guess("GNU/Ruby#.NET"));
-        assert_eq!(Some("python ${script} - ${args}"), guess("Python"));
+        assert_eq!(Some("python ${script} - ${args}".into()), guess("Python"));
         // File extension also works as a "language".
-        assert_eq!(Some("python ${script} - ${args}"), guess("py"));
+        assert_eq!(Some("python ${script} - ${args}".into()), guess("py"));
     }
 
     #[test]
@@ -165,10 +174,11 @@ mod tests {
             tmpfile.write_all(&line.into_bytes()).unwrap();
             // Guess the interpreter for its path.
             guess_interpreter_for_hashbang(tmpfile.path())
+                .map(|i| i.command_line().to_owned())
         };
         assert_eq!(None, guess(""));
         assert_eq!(None, guess("/not/a/hashbang/but/python"));
-        assert_eq!(Some("python ${script} - ${args}"), guess("#!python"));
-        assert_eq!(Some("python ${script} - ${args}"), guess("#!/usr/bin/python"));
+        assert_eq!(Some("python ${script} - ${args}".into()), guess("#!python"));
+        assert_eq!(Some("python ${script} - ${args}".into()), guess("#!/usr/bin/python"));
     }
 }

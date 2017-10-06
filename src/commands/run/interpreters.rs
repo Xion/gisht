@@ -3,16 +3,13 @@
 //! This is only supported on Unix systems.
 
 use std::collections::HashMap;
+use std::fmt;
 use std::io;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::Command;
 
 use shlex;
-
-
-/// Type of an interpreter command line.
-pub type Interpreter = &'static str;
 
 
 lazy_static! {
@@ -39,13 +36,71 @@ lazy_static! {
     /// Interpreters are defined as shell commands with placeholders
     /// for gist script name and its arguments.
     pub static ref COMMON_INTERPRETERS: HashMap<&'static str, Interpreter> = hashmap!{
-        "hs" => "runhaskell ${script} ${args}",
-        "js" => "node -e ${script} ${args}",
-        "pl" => "perl -- ${script} ${args}",
-        "py" => "python ${script} - ${args}",
-        "rb" => "irb -- ${script} ${args}",
-        "sh" => "sh -- ${script} ${args}",
+        "hs" => "runhaskell ${script} ${args}".into(),
+        "js" => "node -e ${script} ${args}".into(),
+        "pl" => "perl -- ${script} ${args}".into(),
+        "py" => "python ${script} - ${args}".into(),
+        "rb" => "irb -- ${script} ${args}".into(),
+        "sh" => "sh -- ${script} ${args}".into(),
     };
+}
+const SCRIPT_PH: &'static str = "${script}";
+const ARGS_PH: &'static str = "${args}";
+
+
+/// Type representing an interpreter that can run gist's binary.
+#[derive(Clone, Debug)]
+pub struct Interpreter {
+    /// "Format string" for the interpeter's commandline.
+    /// Includes ${script} and ${args} placeholders.
+    cmdline: &'static str,
+    /// Additional arguments that should precede gist arguments in ${args}.
+    innate_args: Vec<String>,
+}
+
+impl Interpreter {
+    #[inline]
+    pub fn with_cmdline(cmdline: &'static str) -> Self {
+        Self::new(cmdline, vec![])
+    }
+
+    #[inline]
+    pub fn new(cmdline: &'static str, innate_args: Vec<String>) -> Self {
+        Interpreter { cmdline, innate_args }
+    }
+}
+
+impl From<&'static str> for Interpreter {
+    fn from(input: &'static str) -> Self {
+        Interpreter::with_cmdline(input)
+    }
+}
+
+impl Interpreter {
+    #[inline]
+    pub fn binary(&self) -> &str {
+        self.cmdline.split_whitespace().next().unwrap()
+    }
+
+    #[inline]
+    pub fn command_line(&self) -> &str {
+        self.cmdline
+    }
+
+    pub fn build_invocation<P: AsRef<Path>>(&self, script: P, args: &[String]) -> String {
+        let script = script.as_ref();
+        let args = self.innate_args.iter().chain(args.iter())
+            .map(|a| shlex::quote(a)).collect::<Vec<_>>().join(" ");
+        self.cmdline.to_owned()
+            .replace(SCRIPT_PH, &script.to_string_lossy())
+            .replace(ARGS_PH, &args)
+    }
+}
+
+impl fmt::Display for Interpreter {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.build_invocation(SCRIPT_PH, &[ARGS_PH.to_owned()]))
+    }
 }
 
 
@@ -55,12 +110,8 @@ lazy_static! {
 /// for script path and arguments.
 pub fn interpreted_run<P: AsRef<Path>>(interpreter: Interpreter,
                                        script: P, args: &[String]) -> io::Error {
-    // Format the interpreter-specific command line.
     let script = script.as_ref();
-    let args = args.iter().map(|a| shlex::quote(a)).collect::<Vec<_>>().join(" ");
-    let cmd = interpreter.to_owned()
-        .replace("${script}", &script.to_string_lossy())
-        .replace("${args}", &args);
+    let cmd = interpreter.build_invocation(script, args);
 
     // Split the final interpreter-invoking command into "argv"
     // that can be executed via Command/execvp().
@@ -80,7 +131,7 @@ pub fn interpreted_run<P: AsRef<Path>>(interpreter: Interpreter,
 mod tests {
     use regex::Regex;
     use shlex;
-    use super::{COMMON_INTERPRETERS, LANGUAGE_MAP};
+    use super::{ARGS_PH, COMMON_INTERPRETERS, LANGUAGE_MAP, SCRIPT_PH};
 
     lazy_static! {
         static ref LOWERCASE_RE: Regex = Regex::new("^[a-z]+$").unwrap();
@@ -116,26 +167,26 @@ mod tests {
 
     #[test]
     fn interpreter_command_placeholders() {
-        for cmd in COMMON_INTERPRETERS.values() {
-            assert!(cmd.contains("${script}"),
-                "`{}` doesn't contain a script path placeholder", cmd);
-            assert!(cmd.contains("${args}"),
-                "`{}` doesn't contain a script args placeholder", cmd);
+        for interp in COMMON_INTERPRETERS.values() {
+            assert!(interp.command_line().contains(SCRIPT_PH),
+                "`{}` doesn't contain a script path placeholder", interp);
+            assert!(interp.command_line().contains(ARGS_PH),
+                "`{}` doesn't contain a script args placeholder", interp);
         }
     }
 
     #[test]
     fn interpreter_command_syntax() {
-        for cmd in COMMON_INTERPRETERS.values() {
-            let final_cmd = cmd.to_owned()
-                .replace("${script}", "foo")
-                .replace("${args}", r#"bar "baz thud" qux"#);
+        for interp in COMMON_INTERPRETERS.values() {
+            let final_cmd = interp.command_line().to_owned()
+                .replace(SCRIPT_PH, "foo")
+                .replace(ARGS_PH, r#"bar "baz thud" qux"#);
             let cmd_argv = shlex::split(&final_cmd);
 
             assert!(cmd_argv.is_some(),
-                "Formatted `{}` doesn't parse as a shell command", cmd);
+                "Formatted `{}` doesn't parse as a shell command", interp);
             assert!(cmd_argv.unwrap().len() >= 3,  // interpreter + script path + script args
-                "Formatted `{}` is way too short to be valid", cmd);
+                "Formatted `{}` is way too short to be valid", interp);
         }
     }
 }
