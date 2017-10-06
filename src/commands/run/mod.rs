@@ -1,15 +1,17 @@
-//! Module implementing various commands that can be performed on gists.
+//! Module implementing the actual running of gist "binaries" (scripts).
+//!
+//! This includes guessing of the correct interpreter using
+//! available information (hashbang, gist metadata, etc.).
 
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs;
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 use std::process::Command;
 
 use shlex;
 use exitcode::{self, ExitCode};
-use webbrowser;
 
 use gist::Gist;
 
@@ -265,189 +267,5 @@ lazy_static! {
 }
 
 
-/// Output the gist's binary path.
-pub fn print_binary_path(gist: &Gist) -> ExitCode {
-    trace!("Printing binary path of {:?}", gist);
-    println!("{}", gist.binary_path().display());
-    exitcode::OK
-}
-
-
-/// Print the source of the gist's binary.
-pub fn print_gist(gist: &Gist) -> ExitCode {
-    trace!("Printing source code of {:?}", gist);
-    let mut binary = match fs::File::open(gist.binary_path()) {
-        Ok(file) => file,
-        Err(e) => {
-            error!("Failed to open the binary of gist {}: {}", gist.uri, e);
-            return exitcode::IOERR;
-        },
-    };
-
-    const BUF_SIZE: usize = 256;
-    let mut buf = [0; BUF_SIZE];
-    loop {
-        let c = match binary.read(&mut buf) {
-            Ok(c) => c,
-            Err(e) => {
-                error!("Failed to read the binary of gist {}: {}", gist.uri, e);
-                return exitcode::IOERR;
-            },
-        };
-        if c > 0 {
-            if let Err(e) = io::stdout().write_all(&buf[0..c]) {
-                error!("Failed to write the gist {} to stdout: {}", gist.uri, e);
-                return exitcode::IOERR;
-            }
-        }
-        if c < BUF_SIZE { break }
-    }
-    exitcode::OK
-}
-
-
-/// Open the gist's HTML page in the default system browser.
-pub fn open_gist(gist: &Gist) -> ExitCode {
-    let url = match gist.uri.host().gist_url(gist) {
-        Ok(url) => url,
-        Err(e) => {
-            error!("Failed to determine the URL of gist {}: {}", gist.uri, e);
-            return exitcode::UNAVAILABLE;
-        },
-    };
-    if let Err(e) = webbrowser::open(&url) {
-        error!("Failed to open the URL of gist {} ({}) in the browser: {}",
-            gist.uri, url, e);
-        return exitcode::UNAVAILABLE;
-    };
-    exitcode::OK
-}
-
-
-/// Show summary information about the gist.
-pub fn show_gist_info(gist: &Gist) -> ExitCode {
-    trace!("Obtaining information on {:?}", gist);
-    match gist.uri.host().gist_info(gist) {
-        Ok(Some(info)) => {
-            debug!("Successfully obtained {} piece(s) of information on {:?}",
-                info.len(), gist);
-            print!("{}", info);
-            exitcode::OK
-        },
-        Ok(None) => {
-            warn!("No information available about {:?}", gist);
-            exitcode::UNAVAILABLE
-        },
-        Err(e) => {
-            error!("Failed to obtain information about {:?}: {}", gist, e);
-            exitcode::UNAVAILABLE
-        },
-    }
-}
-
-
 #[cfg(test)]
-mod tests {
-    #[cfg(unix)]
-    mod unix {
-        use std::io::Write;
-        use shlex;
-        use tempfile::NamedTempFile;
-        use regex::Regex;
-        use super::super::{COMMON_INTERPRETERS, LANGUAGE_MAP,
-                           guess_interpreter_for_filename,
-                           guess_interpreter_for_language,
-                           guess_interpreter_for_hashbang};
-
-        lazy_static! {
-            static ref LOWERCASE_RE: Regex = Regex::new("^[a-z]+$").unwrap();
-        }
-
-        #[test]
-        fn language_names() {
-            for lang in LANGUAGE_MAP.keys() {
-                assert!(LOWERCASE_RE.is_match(lang),
-                    "Language name `{}` doesn't match the expected form {}", lang, *LOWERCASE_RE);
-            }
-        }
-
-        #[test]
-        fn language_file_extensions() {
-            for ext in LANGUAGE_MAP.values() {
-                assert!(!ext.starts_with("."),
-                    "`{}` file extension must not start with a dot", ext);
-                assert!(LOWERCASE_RE.is_match(ext),
-                    "`{}` extension doesn't match the expected form {}", ext, *LOWERCASE_RE);
-            }
-        }
-
-        #[test]
-        fn interpreter_file_extensions() {
-            for ext in COMMON_INTERPRETERS.keys() {
-                assert!(!ext.starts_with("."),
-                    "`{}` extension must not start with a dot", ext);
-                assert!(LOWERCASE_RE.is_match(ext),
-                    "`{}` extension doesn't match the expected form {}", ext, *LOWERCASE_RE);
-            }
-        }
-
-        #[test]
-        fn interpreter_command_placeholders() {
-            for cmd in COMMON_INTERPRETERS.values() {
-                assert!(cmd.contains("${script}"),
-                    "`{}` doesn't contain a script path placeholder", cmd);
-                assert!(cmd.contains("${args}"),
-                    "`{}` doesn't contain a script args placeholder", cmd);
-            }
-        }
-
-        #[test]
-        fn interpreter_command_syntax() {
-            for cmd in COMMON_INTERPRETERS.values() {
-                let final_cmd = cmd.to_owned()
-                    .replace("${script}", "foo")
-                    .replace("${args}", r#"bar "baz thud" qux"#);
-                let cmd_argv = shlex::split(&final_cmd);
-
-                assert!(cmd_argv.is_some(),
-                    "Formatted `{}` doesn't parse as a shell command", cmd);
-                assert!(cmd_argv.unwrap().len() >= 3,  // interpreter + script path + script args
-                    "Formatted `{}` is way too short to be valid", cmd);
-            }
-        }
-
-        #[test]
-        fn interpreter_for_filename() {
-            let guess = guess_interpreter_for_filename;
-            assert_eq!(None, guess("/foo/bar"));  // no extension
-            assert_eq!(None, guess("/foo.lolwtf"));  // unknown extension
-            assert_eq!(Some("python ${script} - ${args}"), guess("/foo.py"));
-        }
-
-        #[test]
-        fn interpreter_for_language() {
-            let guess = guess_interpreter_for_language;
-            assert_eq!(None, guess(""));
-            assert_eq!(None, guess("GNU/Ruby#.NET"));
-            assert_eq!(Some("python ${script} - ${args}"), guess("Python"));
-            // File extension also works as a "language".
-            assert_eq!(Some("python ${script} - ${args}"), guess("py"));
-        }
-
-        #[test]
-        fn interpreter_for_hashbang() {
-            let guess = |hashbang: &str| {
-                // Prepare a temp file with the first line being the hashbang.
-                let mut tmpfile = NamedTempFile::new().unwrap();
-                let line = hashbang.to_owned() + "\n";
-                tmpfile.write_all(&line.into_bytes()).unwrap();
-                // Guess the interpreter for its path.
-                guess_interpreter_for_hashbang(tmpfile.path())
-            };
-            assert_eq!(None, guess(""));
-            assert_eq!(None, guess("/not/a/hashbang/but/python"));
-            assert_eq!(Some("python ${script} - ${args}"), guess("#!python"));
-            assert_eq!(Some("python ${script} - ${args}"), guess("#!/usr/bin/python"));
-        }
-    }
-}
+mod tests;
