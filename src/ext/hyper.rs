@@ -53,7 +53,7 @@ pub mod header {
                     rel="(?P<rel>\w+)"
                 "#)
                 .ignore_whitespace(true)
-                .compile().unwrap();
+                .build().unwrap();
             }
 
             let mut links = HashMap::new();
@@ -63,8 +63,8 @@ pub mod header {
                     return Err(hyper::Error::Header);
                 }
                 for li_cap in RE.captures_iter(value) {
-                    let li = LinkItem{rel: li_cap.name("rel").unwrap().to_owned(),
-                                      url: li_cap.name("url").unwrap().to_owned()};
+                    let li = LinkItem{rel: li_cap["rel"].to_owned(),
+                                      url: li_cap["url"].to_owned()};
                     let link_items = links.entry(li.rel.clone()).or_insert_with(|| vec![]);
                     link_items.push(li);
                 }

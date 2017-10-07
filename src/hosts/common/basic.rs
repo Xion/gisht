@@ -63,8 +63,8 @@ impl Basic {
         // Create regex for matching HTML URL by replacing the ID placeholder
         // with a named capture group.
         let html_url_re = format!("^{}$",
-            regex::quote(html_url_pattern).replace(
-                &regex::quote(ID_PLACEHOLDER), &format!("(?P<id>{})", gist_id_re.as_str())));
+            regex::escape(html_url_pattern).replace(
+                &regex::escape(ID_PLACEHOLDER), &format!("(?P<id>{})", gist_id_re.as_str())));
 
         Ok(Basic {
             id: id,
@@ -162,7 +162,7 @@ impl Host for Basic {
             },
         };
 
-        let id = captures.name("id").unwrap();
+        let id = &captures["id"];
         debug!("URL {} points to a {} gist: ID={}", orig_url, self.name, id);
 
         // Return the resolved gist.

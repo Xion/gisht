@@ -129,7 +129,7 @@ impl Host for GitHub {
             },
         };
 
-        let id = captures.name("id").unwrap();
+        let id = &captures["id"];
         trace!("URL {} points to a GitHub gist: ID={}", orig_url, id);
 
         // Obtain gist information using GitHub API.
@@ -143,7 +143,8 @@ impl Host for GitHub {
                 return None;
             },
         };
-        let owner = captures.name("owner").unwrap_or_else(|| api::gist_owner_from_info(&info));
+        let owner = captures.name("owner").map(|o| o.as_str())
+            .unwrap_or_else(|| api::gist_owner_from_info(&info));
 
         // Return the resolved gist.
         let uri = gist::Uri::new(ID, owner, name).unwrap();
@@ -160,7 +161,7 @@ const HTML_URL: &'static str = "https://gist.github.com";
 lazy_static! {
     /// Regular expression for parsing URLs to gist HTML pages.
     static ref HTML_URL_RE: Regex = Regex::new(
-        &format!("^{}/{}$", regex::quote(HTML_URL), r#"((?P<owner>[^/]+)/)?(?P<id>[0-9a-fA-F]+)"#)
+        &format!("^{}/{}$", regex::escape(HTML_URL), r#"((?P<owner>[^/]+)/)?(?P<id>[0-9a-fA-F]+)"#)
     ).unwrap();
 }
 
@@ -255,8 +256,8 @@ mod tests {
         for &(ref valid_url, owner, id) in &*VALID_HTML_URLS {
             let captures = HTML_URL_RE.captures(valid_url)
                 .expect(&format!("Gist HTML URL was incorrectly deemed invalid: {}", valid_url));
-            assert_eq!(owner, captures.name("owner"));
-            assert_eq!(id, captures.name("id").unwrap());
+            assert_eq!(owner, captures.name("owner").map(|o| o.as_str()));
+            assert_eq!(id, &captures["id"]);
         }
         for invalid_url in &*INVALID_HTML_URLS {
             assert!(!HTML_URL_RE.is_match(invalid_url),

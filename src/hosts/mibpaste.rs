@@ -85,7 +85,7 @@ mod internal {
             // Strip the HTML line breaks and entities,
             // and write the "raw" gist back to the original binary file.
             let raw_lines = code_lines.into_iter()
-                .map(|l| TRAILING_BR_RE.replace(&l, ""))
+                .map(|l| TRAILING_BR_RE.replace(&l, "").into_owned())
                 .filter(|l| !l.trim().is_empty());
             let mut file = try!(fs::OpenOptions::new()
                 .read(false).write(true).truncate(true).create(false)
@@ -144,7 +144,7 @@ mod tests {
         for (ref valid_url, id) in valid_html_urls {
             let captures = html_url_re.captures(valid_url)
                 .expect(&format!("Paste's HTML URL was incorrectly deemed invalid: {}", valid_url));
-            assert_eq!(id, captures.name("id").unwrap());
+            assert_eq!(id, &captures["id"]);
         }
         for ref invalid_url in invalid_html_urls {
             assert!(!html_url_re.is_match(invalid_url),

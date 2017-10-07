@@ -135,7 +135,7 @@ mod tests {
         for (ref valid_url, id) in valid_html_urls {
             let captures = html_url_re.captures(valid_url)
                 .expect(&format!("Paste's HTML URL was incorrectly deemed invalid: {}", valid_url));
-            assert_eq!(id, captures.name("id").unwrap());
+            assert_eq!(id, &captures["id"]);
         }
         for ref invalid_url in invalid_html_urls {
             assert!(!html_url_re.is_match(invalid_url),
