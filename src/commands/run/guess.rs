@@ -6,6 +6,7 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 use itertools::Itertools;
+use shlex;
 
 use gist::Gist;
 use super::interpreters::*;
@@ -93,7 +94,7 @@ fn guess_interpreter_for_hashbang<P: AsRef<Path>>(binary_path: P) -> Option<Inte
     trace!("Trying to guess an interpreter for a possible hashbang in {}",
         binary_path.display());
 
-    // Get the path mentioned in the hashbang, if any.
+    // Extract the hashbang, if any.
     let file = try_opt!(fs::File::open(binary_path).ok());
     let reader = BufReader::new(file);
     let first_line = try_opt!(reader.lines().next().and_then(|l| l.ok()));
@@ -101,38 +102,49 @@ fn guess_interpreter_for_hashbang<P: AsRef<Path>>(binary_path: P) -> Option<Inte
         debug!("Gist binary {} doesn't start with a hashbang", binary_path.display());
         return None;
     }
-    let hashbang_path = &first_line[2..];
+    let hashbang = &first_line[2..];
 
-    // XXX: don't assume the entire hashbang is a path; POSIX allows a single argument
-    // to appear after it, too
-    // TODO: treat `#!/usr/bin/env foo` hashbangs specially:
-    // `foo` should be the program there
-
-    // Check if a single known interpreter path starts with the program name,
-    // or the entire hashbang path.
-    let program = Path::new(hashbang_path).file_name().and_then(|n| n.to_str());
-    let path_prefix = hashbang_path.to_owned() + " ";
-    let mut interpreters = vec![];
-    for interp in COMMON_INTERPRETERS.values() {
-        let starts_with_program = program.map(|p| interp.binary() == p).unwrap_or(false);
-        if interp.command_line().starts_with(&path_prefix) || starts_with_program {
-            interpreters.push(interp.clone());
-        }
+    // POSIX permits a single argument to appear after the hashbang program,
+    // (which is often used for /usr/bin/env). We'll actually be more lenient
+    // and allow arbitrary number of arguments and interpret it accordingly.
+    let mut parts = try_opt!(shlex::split(hashbang));
+    if parts.is_empty() {
+        debug!("Gist binary {} starts with an empty hashbang", binary_path.display());
+        return None;
     }
+    let mut program = parts.remove(0);
+    let mut innate_args = parts;
+
+    // Special case for when the program is `env` in which case the actual name
+    // of the interpreter is the second argument (e.g. `#!/usr/bin/env`).
+    if program == "/usr/bin/env" || program == "/bin/env" {  // TODO: also plain "env"?
+        if innate_args.is_empty() {
+            debug!("Gist binary {} has an incorrect #!{} hashbang w/o an argument",
+                binary_path.display(), program);
+            return None;
+        }
+        program = innate_args.remove(0);
+    }
+
+    // Check if a single known interpreter path starts with the program name.
+    let program_name = try_opt!(Path::new(&program).file_name().and_then(|n| n.to_str()));
+    let interpreters: Vec<_> = COMMON_INTERPRETERS.values()
+        .filter(|i| i.binary() == program_name)
+        .cloned().collect();
     match interpreters.len() {
         0 => {
-            debug!("Unrecognized gist binary hashbang: #!{}", hashbang_path);
+            debug!("Unrecognized gist binary hashbang: #!{}", hashbang);
             None
         },
         1 => {
             let result = interpreters.into_iter().next().unwrap();
             debug!("Guessed the interpreter for hashbang #!{} as `{}`",
-                hashbang_path, result);
+                hashbang, result);
             Some(result)
         },
         _ => {
             debug!("Ambiguous hashbang #!{} resolves to multiple possible interpreters:\n{}",
-                hashbang_path, interpreters.into_iter().format("\n"));
+                hashbang, interpreters.into_iter().format_with("\n", |i, f| f(&format_args!("* {}", i))));
             None
         },
     }
@@ -145,13 +157,15 @@ mod tests {
     use tempfile::NamedTempFile;
     use super::*;
 
+    const PYTHON: &'static str = "python ${script} - ${args}";
+
     #[test]
     fn interpreter_for_filename() {
         let guess = |f| guess_interpreter_for_filename(f)
             .map(|i| i.command_line().to_owned());
         assert_eq!(None, guess("/foo/bar"));  // no extension
         assert_eq!(None, guess("/foo.lolwtf"));  // unknown extension
-        assert_eq!(Some("python ${script} - ${args}".into()), guess("/foo.py"));
+        assert_eq!(Some(PYTHON.into()), guess("/foo.py"));
     }
 
     #[test]
@@ -160,9 +174,9 @@ mod tests {
             .map(|i| i.command_line().to_owned());
         assert_eq!(None, guess(""));
         assert_eq!(None, guess("GNU/Ruby#.NET"));
-        assert_eq!(Some("python ${script} - ${args}".into()), guess("Python"));
+        assert_eq!(Some(PYTHON.into()), guess("Python"));
         // File extension also works as a "language".
-        assert_eq!(Some("python ${script} - ${args}".into()), guess("py"));
+        assert_eq!(Some(PYTHON.into()), guess("py"));
     }
 
     #[test]
@@ -176,9 +190,17 @@ mod tests {
             guess_interpreter_for_hashbang(tmpfile.path())
                 .map(|i| i.command_line().to_owned())
         };
+
         assert_eq!(None, guess(""));
         assert_eq!(None, guess("/not/a/hashbang/but/python"));
-        assert_eq!(Some("python ${script} - ${args}".into()), guess("#!python"));
-        assert_eq!(Some("python ${script} - ${args}".into()), guess("#!/usr/bin/python"));
+
+        assert_eq!(Some(PYTHON.into()), guess("#!python"));
+        assert_eq!(Some(PYTHON.into()), guess("#!/usr/bin/python"));
+        assert_eq!(Some(PYTHON.into()), guess("#!/usr/bin/python -O"));
+
+        assert_eq!(Some(PYTHON.into()), guess("#!/usr/bin/env python"));
+        assert_eq!(Some(PYTHON.into()), guess("#!/bin/env python -O"));
+
+        // TODO: verify Interpreter::innate_args
     }
 }

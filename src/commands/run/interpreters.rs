@@ -82,6 +82,7 @@ impl Interpreter {
         self.cmdline.split_whitespace().next().unwrap()
     }
 
+    #[cfg(test)]
     #[inline]
     pub fn command_line(&self) -> &str {
         self.cmdline
