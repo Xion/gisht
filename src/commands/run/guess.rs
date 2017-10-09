@@ -6,6 +6,7 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 use itertools::Itertools;
+use regex::Regex;
 use shlex;
 
 use gist::Gist;
@@ -50,19 +51,16 @@ fn guess_interpreter_for_filename<P: AsRef<Path>>(binary_path: P) -> Option<Inte
 fn guess_interpreter_for_language(language: &str) -> Option<Interpreter> {
     trace!("Trying to guess an interpreter for {} language", language);
 
-    // Make the language name lowercase.
-    let lang: Cow<str> = if language.chars().all(char::is_lowercase) {
-        Cow::Borrowed(language)
-    } else {
-        Cow::Owned(language.to_lowercase())
-    };
+    // Make the language name lowercase & clean it up.
+    let mut lang = language.to_lowercase();
+    lang = LANGNAME_CLEANUP_RE.replace(&*lang, "").into_owned();
 
     // Determine the file extension for this language.
     // In some cases, the "language" may actually be an extension already,
     // so check for that case, too.
     let extension: Cow<str> =
         if LANGUAGE_MAP.values().any(|&ext| ext == &*lang) {
-            lang
+            lang.into()
         } else {
             match LANGUAGE_MAP.get(&*lang) {
                 Some(ext) => Cow::Borrowed(ext),
@@ -77,6 +75,11 @@ fn guess_interpreter_for_language(language: &str) -> Option<Interpreter> {
     debug!("Guessed the interpreter for {} language as `{}`",
         language, interpreter.binary());
     Some(interpreter.clone())
+}
+
+lazy_static! {
+    /// Regex matching characters in gist's language name that are irrelevant.
+    static ref LANGNAME_CLEANUP_RE: Regex = Regex::new(r#"[-+#"'()&]|\[|\]"#).unwrap();
 }
 
 
@@ -137,7 +140,8 @@ fn guess_interpreter_for_hashbang<P: AsRef<Path>>(binary_path: P) -> Option<Inte
             None
         },
         1 => {
-            let result = interpreters.into_iter().next().unwrap();
+            let mut result = interpreters.into_iter().next().unwrap();
+            result.innate_args.extend(innate_args.into_iter());
             debug!("Guessed the interpreter for hashbang #!{} as `{}`",
                 hashbang, result);
             Some(result)
@@ -181,26 +185,35 @@ mod tests {
 
     #[test]
     fn interpreter_for_hashbang() {
-        let guess = |hashbang: &str| {
+        let guess_interp = |hashbang: &str| {
             // Prepare a temp file with the first line being the hashbang.
             let mut tmpfile = NamedTempFile::new().unwrap();
             let line = hashbang.to_owned() + "\n";
             tmpfile.write_all(&line.into_bytes()).unwrap();
             // Guess the interpreter for its path.
             guess_interpreter_for_hashbang(tmpfile.path())
-                .map(|i| i.command_line().to_owned())
+        };
+        let guess_cmd = |hashbang: &str| {
+            guess_interp(hashbang).map(|i| i.command_line().to_owned())
         };
 
-        assert_eq!(None, guess(""));
-        assert_eq!(None, guess("/not/a/hashbang/but/python"));
+        assert_eq!(None, guess_cmd(""));
+        assert_eq!(None, guess_cmd("/not/a/hashbang/but/python"));
 
-        assert_eq!(Some(PYTHON.into()), guess("#!python"));
-        assert_eq!(Some(PYTHON.into()), guess("#!/usr/bin/python"));
-        assert_eq!(Some(PYTHON.into()), guess("#!/usr/bin/python -O"));
+        assert_eq!(Some(PYTHON.into()), guess_cmd("#!python"));
+        assert_eq!(Some(PYTHON.into()), guess_cmd("#!/usr/bin/python"));
+        assert_eq!(Some(PYTHON.into()), guess_cmd("#!/usr/bin/env python"));
 
-        assert_eq!(Some(PYTHON.into()), guess("#!/usr/bin/env python"));
-        assert_eq!(Some(PYTHON.into()), guess("#!/bin/env python -O"));
-
-        // TODO: verify Interpreter::innate_args
+        assert_eq!(
+            Some(Interpreter::new(PYTHON, vec!["foo".into()])),
+            guess_interp("#!python foo"));
+        assert_eq!(
+            Some(Interpreter::new(PYTHON, vec!["foo".into(), "bar".into()])),
+            guess_interp("#!/usr/bin/python foo bar"));
+        // This (>1 arg) technically isn't even what `env` allows but we support it.
+        assert_eq!(
+            Some(Interpreter::new(PYTHON,
+                vec!["foo".into(), "bar".into(), "baz".into()])),
+            guess_interp("#!/usr/bin/env python foo bar baz"));
     }
 }

@@ -33,7 +33,7 @@ lazy_static! {
 
     /// Mapping of common interpreters from file extensions they can handle.
     ///
-    /// Interpreters are defined as shell commands with placeholders
+    /// Interpreters are defined here as shell commands with placeholders
     /// for gist script name and its arguments.
     pub static ref COMMON_INTERPRETERS: HashMap<&'static str, Interpreter> = hashmap!{
         "hs" => "runhaskell ${script} ${args}".into(),
@@ -49,13 +49,13 @@ const ARGS_PH: &'static str = "${args}";
 
 
 /// Type representing an interpreter that can run gist's binary.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Interpreter {
     /// "Format string" for the interpeter's commandline.
     /// Includes ${script} and ${args} placeholders.
     cmdline: &'static str,
     /// Additional arguments that should precede gist arguments in ${args}.
-    innate_args: Vec<String>,
+    pub(super) innate_args: Vec<String>,
 }
 
 impl Interpreter {
@@ -82,12 +82,6 @@ impl Interpreter {
         self.cmdline.split_whitespace().next().unwrap()
     }
 
-    #[cfg(test)]
-    #[inline]
-    pub fn command_line(&self) -> &str {
-        self.cmdline
-    }
-
     pub fn build_invocation<P: AsRef<Path>>(&self, script: P, args: &[String]) -> String {
         let script = script.as_ref();
         let args = self.innate_args.iter().chain(args.iter())
@@ -101,6 +95,14 @@ impl Interpreter {
 impl fmt::Display for Interpreter {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.build_invocation(SCRIPT_PH, &[ARGS_PH.to_owned()]))
+    }
+}
+
+#[cfg(test)]
+impl Interpreter {
+    #[inline]
+    pub fn command_line(&self) -> &str {
+        self.cmdline
     }
 }
 
