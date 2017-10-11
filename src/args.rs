@@ -120,8 +120,8 @@ pub struct Options {
     pub locality: Option<Locality>,
     /// Gist command that's been issued.
     pub command: Command,
-    /// Gist to operate on.
-    pub gist: GistArg,
+    /// Gist to operate on, if any.
+    pub gist: Option<GistArg>,
     /// Arguments to the gist, if any.
     /// This is only used if command == Command::Run.
     pub gist_args: Option<Vec<String>>,
@@ -159,9 +159,10 @@ impl<'a> TryFrom<ArgMatches<'a>> for Options {
         let command = Command::from_str(cmd).unwrap_or(Command::Run);
 
         // Parse out the gist argument.
-        let gist = try!(GistArg::from_str(
-            cmd_matches.value_of(ARG_GIST).unwrap()
-        ));
+        let gist = match cmd_matches.value_of(ARG_GIST) {
+            Some(g) => Some(try!(GistArg::from_str(g))),
+            None => None,
+        };
 
         // For the "run" command, arguments may be provided.
         let mut gist_args = cmd_matches.values_of(ARG_GIST_ARGV)
@@ -556,5 +557,13 @@ mod tests {
         let args = vec!["gisht", "help"];
         assert!(parse_from_argv(args).is_err(),
             "\"help\" command was incorrectly treated as gist command");
+    }
+
+    /// Verify that you can call the program with just the verbosity flags.
+    #[test]
+    fn just_verbosity_works() {
+        let args = vec!["gisht", "-v"];
+        assert!(parse_from_argv(args).is_ok(),
+            "Failed to parse command line with just the verbosity args");
     }
 }

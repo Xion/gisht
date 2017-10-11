@@ -138,7 +138,7 @@ fn main() {
 fn print_args_error(e: ArgsError) -> io::Result<()> {
     match e {
         ArgsError::Parse(ref e) =>
-            // In case of generic parse error,
+            // In case of a generic parse error,
             // message provided by the clap library will be the usage string.
             writeln!(&mut io::stderr(), "{}", e.message),
         e => {
@@ -206,12 +206,17 @@ fn ensure_app_dir(opts: &Options) -> Result<(), ExitCode> {
 /// This may include fetching a fresh gist from a host, or updating it.
 /// If an error occurred, returns the corresponding exit code.
 fn decode_gist(opts: &Options) -> Result<Gist, ExitCode> {
-    let gist = match opts.gist {
-        GistArg::Uri(ref uri) => {
+    if opts.gist.is_none() {
+        error!("No gist provided. Try --help?");
+        return Err(exitcode::USAGE);
+    }
+
+    let gist = match opts.gist.as_ref().unwrap() {
+        &GistArg::Uri(ref uri) => {
             debug!("Gist {} specified as the argument", uri);
             Gist::from_uri(uri.clone())
         },
-        GistArg::BrowserUrl(ref url) => {
+        &GistArg::BrowserUrl(ref url) => {
             debug!("Gist URL `{}` specified as the argument", url);
             let url = url.as_str();
             let maybe_gist = try!(gist_from_url(url));
