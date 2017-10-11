@@ -98,7 +98,9 @@ fn guess_interpreter_for_hashbang<P: AsRef<Path>>(binary_path: P) -> Option<Inte
         binary_path.display());
 
     // Extract the hashbang, if any.
-    let file = try_opt!(fs::File::open(binary_path).ok());
+    let file = try_opt!(fs::File::open(binary_path).map_err(|e| {
+        debug!("Failed to read hashbang from gist binary {}", binary_path.display()); e
+    }).ok());
     let reader = BufReader::new(file);
     let first_line = try_opt!(reader.lines().next().and_then(|l| l.ok()));
     if !first_line.starts_with("#!") {
@@ -138,14 +140,14 @@ fn guess_interpreter_for_hashbang<P: AsRef<Path>>(binary_path: P) -> Option<Inte
         0 => {
             debug!("Unrecognized gist binary hashbang: #!{}", hashbang);
             None
-        },
+        }
         1 => {
             let mut result = interpreters.into_iter().next().unwrap();
             result.innate_args.extend(innate_args.into_iter());
             debug!("Guessed the interpreter for hashbang #!{} as `{}`",
                 hashbang, result);
             Some(result)
-        },
+        }
         _ => {
             debug!("Ambiguous hashbang #!{} resolves to multiple possible interpreters:\n{}",
                 hashbang, interpreters.into_iter().format_with("\n", |i, f| f(&format_args!("* {}", i))));

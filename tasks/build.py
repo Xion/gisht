@@ -90,7 +90,7 @@ def readme(ctx, release=False, verbose=False):
         f.write(readme_content)
 
 
-# TODO: consider doing this via a Cargp build script,
+# TODO: consider doing this via a Cargo build script,
 # as described in https://blog.clap.rs/complete-me/
 @task(pre=[bin], help=HELP)
 def completions(ctx, release=False, verbose=False):

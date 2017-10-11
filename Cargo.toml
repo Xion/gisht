@@ -39,6 +39,9 @@ try_opt = "*"
 url = "1.2"
 webbrowser = "0.1.3"
 
+[build-dependencies]
+rustc_version = "0.2"
+
 [dev-dependencies]
 tempfile = "2.1.5"
 
