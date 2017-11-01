@@ -283,18 +283,11 @@ impl Command {
     /// Aliases (alternative names) for this command.
     /// These aliases are visible in the application's help message.
     fn aliases(&self) -> &'static [&'static str] {
-        // Each possible result needs to have it's own named constant
-        // because otherwise Rust cannot make them properly 'static -_-
-        const RUN_ALIASES: &'static [&'static str] = &["exec"];
-        const PRINT_ALIASES: &'static [&'static str] = &["cat"];
-        const OPEN_ALIASES: &'static [&'static str] = &["show"];
-        const INFO_ALIASES: &'static [&'static str] = &["stat"];
-
         match *self {
-            Command::Run => RUN_ALIASES,
-            Command::Print => PRINT_ALIASES,
-            Command::Open => OPEN_ALIASES,
-            Command::Info => INFO_ALIASES,
+            Command::Run => &["exec"],
+            Command::Print => &["cat"],
+            Command::Open => &["show"],
+            Command::Info => &["stat"],
             _ => &[],
         }
     }
