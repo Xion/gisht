@@ -303,4 +303,38 @@ fn simple_get(url: Url) -> io::Result<Response> {
 }
 
 
-// TODO: write tests for GistsIterator, esp. gist_from_json
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
+    use serde_json::Value as Json;
+    use util::http_client;
+    use super::GistsIterator;
+
+    #[test]
+    fn gists_iterator_with_cached_items() {
+        let owner = "Octocat";
+        let gist_id = "12345";
+        let gist_name = "test-gist";
+        let gist_json = format!(r#"{{
+            "id": "{}",
+            "description": "Test gist",
+            "owner": {{"login": "{owner}"}},
+            "files": {{"{name}": "<omitted>"}}
+        }}"#, id=gist_id, owner=owner, name=gist_name);
+
+        let mut iter = GistsIterator {
+            owner: owner,
+            gists_url: None,
+            gists_json_array: Some(vec![Json::from_str(&gist_json).unwrap()]),
+            index: 0,
+            http: http_client(),
+        };
+        let gist = iter.next().unwrap();
+
+        assert_eq!(gist_id, gist.id.as_ref().unwrap());
+        assert_eq!(owner, gist.uri.owner);
+        assert_eq!(gist_name, gist.uri.name);
+    }
+
+    // TODO: test GistsIterator with a mock/fake http_client
+}
