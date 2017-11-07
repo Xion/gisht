@@ -53,7 +53,10 @@ Windows binaries coming soon.
 `gisht` is written in Rust. Besides the [Rust toolchain](http://rustup.sh), build requirements include:
 
 * cmake 2.8.11 or higher (for compiling libgit2)
-* OpenSSL (for hyper) -- likely only a problem on OSX
+* OpenSSL 1.1 (for hyper)
+  * on Linux, it likely means `libssl-dev` or equivalent package must be installed
+  * on OSX, besides the relevant package, it may also require adjusting some environment variables
+  * (Windows unknown)
 
 Additionally, the Python-based [Invoke](http://pyinvoke.org) task runner is used for automation.
 It is recommended you install it inside a Python virtualenv. e.g.:
