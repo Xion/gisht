@@ -152,7 +152,7 @@ impl<'o> GistsIterator<'o> {
 
     /// Convert a JSON representation of the gist into a Gist object.
     fn gist_from_json(&self, gist: &Json) -> Option<Gist> {
-        let id = gist.pointer("id").and_then(Json::as_str).unwrap();
+        let id = gist.pointer("/id").and_then(Json::as_str).unwrap();
         let name = match gist_name_from_info(&gist) {
             Some(name) => name,
             None => {
@@ -301,3 +301,6 @@ fn simple_get(url: Url) -> io::Result<Response> {
         .send()
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
 }
+
+
+// TODO: write tests for GistsIterator, esp. gist_from_json
