@@ -71,12 +71,16 @@ def cargo(ctx, cmd, *args, **kwargs):
     cargo_args = [cmd]
     cargo_args.extend(args)
 
+    env = {'RUST_BACKTRACE': 'full'}
+
     wait = kwargs.pop('wait', True)
     if wait:
+        kwargs.setdefault('env', {}).update(env)
         return ctx.run('cargo ' + ' '.join(map(quote, cargo_args)), **kwargs)
     else:
         argv = ['cargo'] + cargo_args  # execvpe() needs explicit argv[0]
-        os.execvpe(argv[0], argv, os.environ)
+        env.update(os.environ)
+        os.execvpe(argv[0], argv, env)
 
 
 def read_cargo_toml(key, manifest=None):
