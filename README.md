@@ -54,9 +54,10 @@ Windows binaries coming soon.
 
 * cmake 2.8.11 or higher (for compiling libgit2)
 * OpenSSL 1.1 (for hyper)
-  * on Linux, it likely means `libssl-dev` or equivalent package must be installed
+  * on Linux, it likely means `libssl1.1`, `libssl-dev`, and/or equivalent package(s) must be installed
   * on OSX, besides the relevant package, it may also require adjusting some environment variables
   * (Windows unknown)
+* Some Linux setups may require installing of `libssh-dev` and `pkg-config`.
 
 Additionally, the Python-based [Invoke](http://pyinvoke.org) task runner is used for automation.
 It is recommended you install it inside a Python virtualenv. e.g.:
