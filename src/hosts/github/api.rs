@@ -160,8 +160,14 @@ impl<'o> GistsIterator<'o> {
                 return None;
             },
         };
+
         let uri = gist::Uri::new(ID, self.owner, name).unwrap();
-        trace!("GitHub gist found ({}) with id={}", uri, id);
+        if uri.owner != self.owner {
+            warn!("Foreign gist ({}, ID={}) found when iterating {}'s gists",
+                uri, id, self.owner);
+            return None;
+        }
+        trace!("GitHub gist found ({}) with ID={}", uri, id);
 
         // Include the gist Info with fields that are commonly used by gist commands.
         // TODO: determine the complete set of fields that can be fetched here
@@ -305,25 +311,39 @@ fn simple_get(url: Url) -> io::Result<Response> {
 
 #[cfg(test)]
 mod test {
+    use std::borrow::Cow;
     use std::str::FromStr;
     use serde_json::Value as Json;
     use util::http_client;
-    use super::GistsIterator;
+    use super::{GistsIterator, gist_language_from_info};
+
+    const OWNER: &'static str = "Octocat";
+    const GIST_ID: &'static str = "12345";
+    const GIST_NAME: &'static str = "test-gist";
+
+    #[test]
+    fn gists_iterator_without_items() {
+        let mut iter = GistsIterator {
+            owner: OWNER,
+            gists_url: None,
+            gists_json_array: Some(vec![]),
+            index: 0,
+            http: http_client(),
+        };
+        assert_eq!(None, iter.next());
+    }
 
     #[test]
     fn gists_iterator_with_cached_items() {
-        let owner = "Octocat";
-        let gist_id = "12345";
-        let gist_name = "test-gist";
         let gist_json = format!(r#"{{
             "id": "{}",
             "description": "Test gist",
             "owner": {{"login": "{owner}"}},
             "files": {{"{name}": "<omitted>"}}
-        }}"#, id=gist_id, owner=owner, name=gist_name);
+        }}"#, id=GIST_ID, owner=OWNER, name=GIST_NAME);
 
         let mut iter = GistsIterator {
-            owner: owner,
+            owner: OWNER,
             gists_url: None,
             gists_json_array: Some(vec![Json::from_str(&gist_json).unwrap()]),
             index: 0,
@@ -331,10 +351,73 @@ mod test {
         };
         let gist = iter.next().unwrap();
 
-        assert_eq!(gist_id, gist.id.as_ref().unwrap());
-        assert_eq!(owner, gist.uri.owner);
-        assert_eq!(gist_name, gist.uri.name);
+        assert_eq!(GIST_ID, gist.id.as_ref().unwrap());
+        assert_eq!(OWNER, gist.uri.owner);
+        assert_eq!(GIST_NAME, gist.uri.name);
     }
 
     // TODO: test GistsIterator with a mock/fake http_client
+
+    #[test]
+    fn gist_language_single() {
+        let language = "TrumpScript";
+        let gist_json = format!(r#"{{
+            "id": "{}",
+            "description": "Test gist",
+            "owner": {{"login": "{owner}"}},
+            "files": {{
+                "{name}": {{
+                    "language": "{language}"
+                }}
+            }}
+        }}"#, id=GIST_ID, owner=OWNER, name=GIST_NAME, language=language);
+
+        let gist_info = Json::from_str(&gist_json).unwrap();
+        let gist_lang = gist_language_from_info(&gist_info).map(Cow::into_owned);
+        assert_eq!(Some(language.into()), gist_lang);
+    }
+
+    #[test]
+    fn gist_language_multiple() {
+        let languages = ["TrumpScript", "Haskal", "Rust++"];
+        let gist_json = format!(r#"{{
+            "id": "{}",
+            "description": "Test gist",
+            "owner": {{"login": "{owner}"}},
+            "files": {{
+                "{name}": {{
+                    "language": "{lang0}"
+                }},
+                "second": {{
+                    "language": "{lang1}"
+                }},
+                "third": {{
+                    "language": "{lang2}"
+                }}
+            }}
+        }}"#,
+        id=GIST_ID, owner=OWNER, name=GIST_NAME,
+        lang0=languages[0], lang1=languages[1], lang2=languages[2]);
+
+        let gist_info = Json::from_str(&gist_json).unwrap();
+        let gist_lang = gist_language_from_info(&gist_info).map(Cow::into_owned);
+
+        // Note that the exact ordering of languages depends on how the JSON
+        // gets parsed into a HashMap, and the resulting order of "files".
+        // This is wonkiness inside the whole GitHub gist support code
+        // and we cannot really do anything about it :(
+        assert!(gist_lang.is_some());
+        let expected = {
+            let mut langs: Vec<_> = languages.iter().map(ToOwned::to_owned).collect();
+            langs.sort();
+            langs
+        };
+        let actual = {
+            let mut langs: Vec<_> = gist_lang.unwrap()
+                .split(", ").map(ToOwned::to_owned).collect();
+            langs.sort();
+            langs
+        };
+        assert_eq!(expected, actual);
+    }
 }
