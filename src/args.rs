@@ -264,6 +264,9 @@ macro_attr! {
         Open,
         /// Display summary information about the gist.
         Info,
+
+        /// List the information about available gist hosts.
+        Hosts,
     }
 }
 
@@ -277,6 +280,7 @@ impl Command {
             Command::Print => "print",
             Command::Open => "open",
             Command::Info => "info",
+            Command::Hosts => "hosts",
         }
     }
 
@@ -288,7 +292,16 @@ impl Command {
             Command::Print => &["cat"],
             Command::Open => &["show"],
             Command::Info => &["stat"],
+            Command::Hosts => &["services"],
             _ => &[],
+        }
+    }
+
+    /// Whether the command takes a gist as an argument.
+    pub fn takes_gist(&self) -> bool {
+        match *self {
+            Command::Hosts => false,
+            _ => true,
         }
     }
 }
@@ -355,6 +368,9 @@ fn create_full_parser<'p>() -> Parser<'p> {
         .subcommand(subcommand_for(Command::Info)
             .about("Display summary information about the gist")
             .arg(gist_arg("Gist to display info on")))
+
+        .subcommand(subcommand_for(Command::Hosts)
+            .about("List supported gist hosts (services)"))
 
         .after_help(
             "Hint: `gisht run GIST` can be shortened to just `gisht GIST`.\n\

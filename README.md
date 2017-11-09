@@ -30,6 +30,7 @@ Magic!
         print    Print the source code of gist's binary [aliases: cat]
         open     Open the gist's webpage [aliases: show]
         info     Display summary information about the gist [aliases: stat]
+        hosts    List supported gist hosts (services) [aliases: services]
         help     Prints this message or the help of the given subcommand(s)
     
     Hint: `gisht run GIST` can be shortened to just `gisht GIST`.

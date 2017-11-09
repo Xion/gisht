@@ -63,7 +63,7 @@ use exitcode::ExitCode;
 use log::LogLevel::*;
 
 use args::{ArgsError, Command, GistArg, Locality, Options};
-use commands::{run_gist, print_binary_path, print_gist, open_gist, show_gist_info};
+use commands::*;
 use gist::Gist;
 use hosts::FetchMode;
 
@@ -123,14 +123,7 @@ fn main() {
 
     ensure_app_dir(&opts).unwrap_or_else(|e| exit(e));
 
-    let gist = decode_gist(&opts).unwrap_or_else(|e| exit(e));
-    let exit_code = match opts.command {
-        Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
-        Command::Which => print_binary_path(&gist),
-        Command::Print => print_gist(&gist),
-        Command::Open => open_gist(&gist),
-        Command::Info => show_gist_info(&gist),
-    };
+    let exit_code = run(opts);
     exit(exit_code)
 }
 
@@ -199,6 +192,31 @@ fn ensure_app_dir(opts: &Options) -> Result<(), ExitCode> {
     }
     debug!("Application directory ({}) created successfully.", APP_DIR.display());
     Ok(())
+}
+
+
+/// Entry point for running the actual program logic
+/// once the command line has been parsed.
+fn run(opts: Options) -> ExitCode {
+    if opts.command.takes_gist() {
+        let gist = match decode_gist(&opts) {
+            Ok(g) => g,
+            Err(code) => return code,
+        };
+        match opts.command {
+            Command::Run => run_gist(&gist, opts.gist_args.as_ref().unwrap()),
+            Command::Which => print_binary_path(&gist),
+            Command::Print => print_gist(&gist),
+            Command::Open => open_gist(&gist),
+            Command::Info => show_gist_info(&gist),
+            _ => unreachable!(),
+        }
+    } else {
+        match opts.command {
+            Command::Hosts => list_hosts(),
+            _ => unreachable!(),
+        }
+    }
 }
 
 
