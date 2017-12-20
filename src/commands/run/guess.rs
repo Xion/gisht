@@ -109,9 +109,21 @@ fn guess_interpreter_for_hashbang<P: AsRef<Path>>(binary_path: P) -> Option<Inte
     }
     let hashbang = &first_line[2..];
 
-    // POSIX permits a single argument to appear after the hashbang program,
-    // (which is often used for /usr/bin/env). We'll actually be more lenient
-    // and allow arbitrary number of arguments and interpret it accordingly.
+    // Operating systems differ when it comes to handling arguments after the
+    // hashbang program:
+    //
+    // * Linux treats everything after first space as one argument
+    // * OSX does the usual shell splitting on those arguments
+    // * Solaris does shell splitting but retains only the first argument
+    //
+    // The Linux behavior is somewhat well know, but the OSX one is the most
+    // intuitive and flexible. Since portable scripts would not rely on
+    // anything beyond the first argument anyway, it's best to try and help
+    // the less portable ones to work correctly by emulating the OSX behavior
+    // even on non-OSX systems.
+    //
+    // One advantage of this is that the program invoked via /usr/bin/env
+    // can take its own arguments, too.
     let mut parts = try_opt!(shlex::split(hashbang));
     if parts.is_empty() {
         debug!("Gist binary {} starts with an empty hashbang", binary_path.display());
@@ -119,6 +131,13 @@ fn guess_interpreter_for_hashbang<P: AsRef<Path>>(binary_path: P) -> Option<Inte
     }
     let mut program = parts.remove(0);
     let mut innate_args = parts;
+    if cfg!(target_os = "linux") && innate_args.len() > 1 {
+        // TODO: consider also warning when the whole hashbang line is longer
+        // than 128 bytes on Linux because this is how much the kernel would
+        // actually read if this was executed normally
+        warn!(
+            "Multiple args to the hashbang program will be treated separately.");
+    }
 
     // Special case for when the program is `env` in which case the actual name
     // of the interpreter is the second argument (e.g. `#!/usr/bin/env`).

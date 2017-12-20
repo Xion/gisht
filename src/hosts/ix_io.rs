@@ -64,7 +64,7 @@ mod internal {
             self.inner.gist_info(gist)
         }
 
-        /// Resolve given URL as potentially pointing to a sprunge.us gist.
+        /// Resolve given URL as potentially pointing to an ix.io gist.
         fn resolve_url(&self, url: &str) -> Option<io::Result<Gist>> {
             let url_obj = try_opt!(Url::parse(url).ok());
 
