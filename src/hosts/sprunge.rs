@@ -91,9 +91,7 @@ mod internal {
                 other => return other,
             };
             if let Some(lang) = lang {
-                let info_builder = gist.info.clone()
-                    .map(|i| i.to_builder()).unwrap_or_else(gist::InfoBuilder::new);
-                gist.info = Some(info_builder.with(Datum::Language, &lang).build());
+                gist.info = Some(gist.info_builder().with(Datum::Language, &lang).build());
             }
 
             Some(Ok(gist))

@@ -70,8 +70,7 @@ mod internal {
         }
 
         fn gist_info(&self, gist: &Gist) -> io::Result<Option<gist::Info>> {
-            let mut info = try!(self.inner.gist_info(gist))
-                .unwrap_or_else(|| gist::InfoBuilder::new().build());
+            let mut info = try!(self.inner.gist_info(gist)).unwrap_or_else(gist::Info::default);
 
             // Deduce the gist language from its extension.
             if let Some(ref full_id) = gist.info(gist::Datum::Id) {
@@ -107,9 +106,7 @@ mod internal {
             };
             if let Some(ext) = extension {
                 let full_id = format!("{}{}", gist.id.as_ref().unwrap(), ext);
-                let info_builder = gist.info.clone()
-                    .map(|i| i.to_builder()).unwrap_or_else(gist::InfoBuilder::new);
-                gist.info = Some(info_builder.with(gist::Datum::Id, &full_id).build());
+                gist.info = Some(gist.info_builder().with(gist::Datum::Id, &full_id).build());
             }
 
             Some(Ok(gist))

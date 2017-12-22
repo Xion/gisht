@@ -95,6 +95,12 @@ impl Gist {
         }
     }
 
+    /// Get an InfoBuilder based on this gist's Info (if any).
+    #[inline]
+    pub fn info_builder(&self) -> InfoBuilder {
+        self.info.clone().map(|i| i.to_builder()).unwrap_or_else(InfoBuilder::new)
+    }
+
     /// Retrieve the main language this gist has been written in, if known.
     pub fn main_language(&self) -> Option<&str> {
         let info = try_opt!(self.info.as_ref());

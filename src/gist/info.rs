@@ -95,6 +95,12 @@ impl Info {
     }
 }
 
+impl Default for Info {
+    fn default() -> Self {
+        InfoBuilder::new().build()
+    }
+}
+
 impl fmt::Debug for Info {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         try!(write!(fmt, "{}", "gist::Info"));

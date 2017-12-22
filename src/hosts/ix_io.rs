@@ -137,9 +137,7 @@ mod internal {
             };
             if let Some(lang) = lang {
                 trace!("Adding language to ix.io gist: {}", lang);
-                let info_builder = gist.info.clone()
-                    .map(|i| i.to_builder()).unwrap_or_else(gist::InfoBuilder::new);
-                gist.info = Some(info_builder.with(Datum::Language, lang).build());
+                gist.info = Some(gist.info_builder().with(Datum::Language, lang).build());
             }
 
             Some(Ok(gist))
