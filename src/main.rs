@@ -135,11 +135,8 @@ fn print_args_error(e: ArgsError) -> io::Result<()> {
             // message provided by the clap library will be the usage string.
             writeln!(&mut io::stderr(), "{}", e.message),
         e => {
-            let mut msg = "Failed to parse arguments".to_owned();
-            if let Some(cause) = e.cause() {
-                msg += &format!(": {}", cause);
-            }
-            writeln!(&mut io::stderr(), "{}", msg)
+            writeln!(&mut io::stderr(), "Failed to parse arguments: {}",
+                e.cause().map(|c| format!("{}", c)).unwrap_or_else(|| "<unknown error>".into()))
         },
     }
 }
