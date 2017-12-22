@@ -68,7 +68,9 @@ pub fn init(verbosity: isize) -> Result<(), SetLoggerError> {
     builder = builder.filter(None, level);
 
     // Make some of the libraries less chatty.
-    builder = builder.filter(Some("hyper"), FilterLevel::Info);
+    builder = builder
+        .filter(Some("html5ever"), FilterLevel::Info)
+        .filter(Some("hyper"), FilterLevel::Info);
 
     // Include any additional config from environmental variables.
     // This will override the options above if necessary,
