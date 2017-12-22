@@ -73,6 +73,25 @@ pub trait Host : Send + Sync {
         None
     }
 }
+// TODO: remove this boilerplate impl when `impl Trait` is stable
+// and we can use it in create() methods of specific hosts
+impl<H: Host + ?Sized> Host for Box<H> {
+    fn id(&self) -> &'static str { (&**self).id() }
+    fn name(&self) -> &str       { (&**self).name() }
+
+    fn fetch_gist(&self, gist: &Gist, mode: FetchMode) -> io::Result<()> {
+        (&**self).fetch_gist(gist, mode)
+    }
+    fn gist_url(&self, gist: &Gist) -> io::Result<String> {
+        (&**self).gist_url(gist)
+    }
+    fn gist_info(&self, gist: &Gist) -> io::Result<Option<gist::Info>> {
+        (&**self).gist_info(gist)
+    }
+    fn resolve_url(&self, url: &str) -> Option<io::Result<Gist>> {
+        (&**self).resolve_url(url)
+    }
+}
 
 macro_attr! {
     #[derive(Clone, Debug, PartialEq, Eq, Hash,

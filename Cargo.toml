@@ -46,6 +46,7 @@ rustc_version = "0.2"
 
 [dev-dependencies]
 tempfile = "2.1.5"
+traitobject = "0.1.0"
 
 [profile.release]
 lto = true

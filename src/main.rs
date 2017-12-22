@@ -37,6 +37,7 @@
 #[macro_use] extern crate log;
 
 #[cfg(test)] extern crate tempfile;
+#[cfg(test)] extern crate traitobject;
 
 
 #[macro_use]

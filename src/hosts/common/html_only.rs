@@ -34,6 +34,7 @@ use super::util::{ID_PLACEHOLDER, HTTP, HTTPS, validate_url_pattern};
 /// Other than that, they are very similar to `Basic` hosts:
 /// gists are only downloaded once, not updated, consist of a single file, etc.
 #[derive(Debug)]
+#[cfg_attr(test, repr(C))]  // TODO: remove when `impl Trait` is stable
 pub struct HtmlOnly<P: Predicate + Clone + Send> {
     /// ID of the gist host.
     id: &'static str,
