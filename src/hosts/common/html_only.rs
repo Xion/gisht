@@ -1,55 +1,59 @@
-//! Module implementing a basic gist host.
+//! Module implementing an HTML-only gist host.
 
 use std::borrow::Cow;
 use std::error::Error;
 use std::fs;
-use std::io::{self, BufRead, BufReader, Write};
-use std::path::Path;
+use std::io::{self, Read, Write};
 
-use hyper::client::Response;
+use antidote::Mutex;
 use hyper::header::UserAgent;
+use select::document::Document;
+use select::predicate::Predicate;
 use regex::{self, Regex};
 
 use ::USER_AGENT;
 use gist::{self, Gist};
 use hosts::{FetchMode, Host};
-use util::{LINESEP, mark_executable, symlink_file, http_client};
+use util::{http_client, mark_executable, symlink_file};
 use super::util::{ID_PLACEHOLDER, HTTP, HTTPS, validate_url_pattern};
 
 
-/// Basic gist host.
+// TODO: large swaths of the code here have been copied from Basic --
+// the only thing that really differs is HtmlOnly::download_gist;
+// we could encapsulate the concept of single-file gist that's never updated
+// in a separate type that both Basic & HtmlOnly would use,
+// and that would contain the logic for resolving HTML URLs and gists
+// (something like SingleFileGistResolver).
+
+
+/// HTML-only gist host.
 ///
-/// The implementation is based upon the following assumptions:
-/// * Every gist consists of a single file only
-/// * Gists are only downloaded once and never need to be updated
-/// * Gists are identified by their ID only,
-///   and their URLs are in the basic form of http://example.com/$ID.
+/// As the name indicates, those hosts offer only the HTML versions of gists,
+/// requiring us to do some gymnastics in order to extract their raw content.
 ///
-/// As it turns out, a surprising number of actual gist hosts fit this description,
-/// including the popular ones such pastebin.com.
+/// Other than that, they are very similar to `Basic` hosts:
+/// gists are only downloaded once, not updated, consist of a single file, etc.
 #[derive(Debug)]
-pub struct Basic {
+pub struct HtmlOnly<P: Predicate + Clone + Send> {
     /// ID of the gist host.
     id: &'static str,
     /// User-visible name of the gist host.
     name: &'static str,
-    /// Pattern for "raw" URLs used to download gists.
-    raw_url_pattern: &'static str,
     /// Pattern for URLs pointing to browser pages of gists.
     html_url_pattern: &'static str,
     /// Regular expression for recognizing browser URLs
     html_url_re: Regex,
+    /// Predicate for finding gist code in the HTML page.
+    code_predicate: Mutex<P>,  // for Host: Send + Sync
 }
 
-// Creation functions.
-impl Basic {
-    // TODO: use the Builder pattern
+impl<P: Predicate + Clone + Send> HtmlOnly<P> {
+    // TODO: use the builder pattern
     pub fn new(id: &'static str,
                name: &'static str,
-               raw_url_pattern: &'static str,
                html_url_pattern: &'static str,
-               gist_id_re: Regex) -> Result<Self, Box<Error>> {
-        try!(validate_url_pattern(raw_url_pattern));
+               gist_id_re: Regex,
+               code_predicate: P) -> Result<Self, Box<Error>> {
         try!(validate_url_pattern(html_url_pattern));
 
         // Create regex for matching HTML URL by replacing the ID placeholder
@@ -58,19 +62,19 @@ impl Basic {
             regex::escape(html_url_pattern).replace(
                 &regex::escape(ID_PLACEHOLDER), &format!("(?P<id>{})", gist_id_re.as_str())));
 
-        Ok(Basic {
+        Ok(HtmlOnly {
             id: id,
             name: name,
-            raw_url_pattern: raw_url_pattern,
             html_url_pattern: html_url_pattern,
             html_url_re: try!(Regex::new(&html_url_re)),
+            code_predicate: Mutex::new(code_predicate),
         })
     }
 }
 
 // Accessors / getters, used for testing of individual host setups.
 #[cfg(test)]
-impl Basic {
+impl<P: Predicate + Clone + Send> HtmlOnly<P> {
     pub fn html_url_regex(&self) -> &Regex { &self.html_url_re }
 
     /// Returns the scheme + domain part of HTML URLs, like: http://example.com
@@ -80,7 +84,7 @@ impl Basic {
     }
 }
 
-impl Host for Basic {
+impl<P: Predicate + Clone + Send> Host for HtmlOnly<P> {
     fn id(&self) -> &'static str { self.id }
     fn name(&self) -> &'static str { self.name }
 
@@ -152,7 +156,7 @@ impl Host for Basic {
 }
 
 // Fetching gists.
-impl Basic {
+impl<P: Predicate + Clone + Send> HtmlOnly<P> {
     /// Return a "resolved" Gist that has the host ID associated with it.
     fn resolve_gist<'g>(&self, gist: &'g Gist) -> Cow<'g, Gist> {
         debug!("Resolving {} gist: {:?}", self.name, gist);
@@ -170,16 +174,28 @@ impl Basic {
     }
 
     /// Download given gist.
+    /// The gist is downloaded from the HTML URL and its code is extracted
+    /// using the stored HTML predicate.
     fn download_gist<'g>(&self, gist: &'g Gist) -> io::Result<&'g Gist> {
         let http = http_client();
 
-        // Download the gist using the raw URL pattern.
-        let url = self.raw_url_pattern.replace(ID_PLACEHOLDER, gist.id.as_ref().unwrap());
+        // Download the gist using the HTML URL pattern.
+        let url = self.html_url_pattern.replace(ID_PLACEHOLDER, gist.id.as_ref().unwrap());
         debug!("Downloading {} gist from {}", self.name, url);
         let mut resp = try!(http.get(&url)
             .header(UserAgent(USER_AGENT.clone()))
             .send()
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
+
+        let mut html = String::new();
+        resp.read_to_string(&mut html)?;
+
+        // Get the HTML nodes matching the predicate and concatenate their text content.
+        let document = Document::from(html.as_str());
+        let code = document.find(self.code_predicate.lock().clone())
+            .fold(String::new(), |mut s, node| {
+                s.push_str(node.text().as_str()); s
+            });
 
         // Save it under the gist path.
         // Note that Gist::path for basic gists points to a single file, not a directory,
@@ -187,7 +203,10 @@ impl Basic {
         let path = gist.path();
         debug!("Saving gist {} as {}", gist.uri, path.display());
         try!(fs::create_dir_all(path.parent().unwrap()));
-        try!(write_http_response_file(&mut resp, &path));
+        let mut file = try!(fs::OpenOptions::new()
+            .create(true).write(true).truncate(true)
+            .open(&path));
+        write!(&mut file, "{}", code)?;
 
         // Make sure the gist's executable is, in fact, executable.
         let executable = path;
@@ -207,7 +226,7 @@ impl Basic {
 }
 
 // Resolving gist URLs.
-impl Basic {
+impl<P: Predicate + Clone + Send> HtmlOnly<P> {
     fn sanitize_url<'u>(&self, url: &'u str) -> Cow<'u, str> {
         let mut url = Cow::Borrowed(url.trim());
 
@@ -243,7 +262,7 @@ impl Basic {
 }
 
 // Other utility methods.
-impl Basic {
+impl<P: Predicate + Clone + Send> HtmlOnly<P> {
     /// Check if given Gist is for this host. Invoke using try!().
     fn ensure_host_id(&self, gist: &Gist) -> io::Result<()> {
         if gist.uri.host_id != self.id {
@@ -251,69 +270,5 @@ impl Basic {
                 "expected a {} gist, but got a '{}' one", self.name, gist.uri.host_id)));
         }
         Ok(())
-    }
-}
-
-// Utility functions
-
-/// Write an HTTP response to a file.
-/// If the file exists, it is overwritten.
-fn write_http_response_file<P: AsRef<Path>>(response: &mut Response, path: P) -> io::Result<()> {
-    let path = path.as_ref();
-    let mut file = try!(fs::OpenOptions::new()
-        .create(true).write(true).truncate(true)
-        .open(path));
-
-    // Read the response line-by-line and write it to the file
-    // with an OS-specific line separator.
-    let reader = BufReader::new(response);
-    let (mut line_count, mut byte_count) = (0, 0);
-    for line in reader.lines() {
-        let line = try!(line);
-        try!(file.write_fmt(format_args!("{}{}", line, LINESEP))
-            .map_err(|e| io::Error::new(e.kind(),
-                format!("Couldn't write file {}: {}", path.display(), e))));
-        line_count += 1;
-        byte_count += line.len() + LINESEP.len();
-    }
-
-    trace!("Wrote {} line(s) ({} byte(s)) to {}", line_count, byte_count, path.display());
-    Ok(())
-}
-
-
-#[cfg(test)]
-mod tests {
-    use regex::Regex;
-    use super::Basic;
-
-    const ID: &'static str = "foo";
-    const NAME: &'static str = "Foo";
-    lazy_static! {
-        static ref ID_RE: Regex = Regex::new(r"\w+").unwrap();
-    }
-
-    #[test]
-    fn invalid_raw_url() {
-        let error = Basic::new(
-            ID, NAME, "invalid", "http://example.com/${id}", ID_RE.clone()).unwrap_err();
-        assert!(format!("{}", error).contains("URL"));
-
-        let error = Basic::new(ID, NAME,
-                               "http://example.com/nolaceholder",
-                               "http://example.com/${id}", ID_RE.clone()).unwrap_err();
-        assert!(format!("{}", error).contains("placeholder"));
-    }
-
-    #[test]
-    fn invalid_html_url() {
-        let error = Basic::new(
-            ID, NAME, "http://example.com/${id}", "invalid", ID_RE.clone()).unwrap_err();
-        assert!(format!("{}", error).contains("URL"));
-
-        let error = Basic::new(ID, NAME,
-                               "http://example.com/${id}",
-                               "http://example.com/nolaceholder", ID_RE.clone()).unwrap_err();
-        assert!(format!("{}", error).contains("placeholder"));
     }
 }

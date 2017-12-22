@@ -12,6 +12,7 @@ license = "GPLv2"
 
 [dependencies]
 ansi_term = "0.9"
+antidote = "1.0.0"
 clap = { version = "2.19.2", features = ["suggestions"] }
 conv = "0.3"
 enum_derive = "*"
@@ -28,6 +29,7 @@ log = "0.3"
 macro-attr = "*"
 maplit = "0.1"
 regex = "0.2"
+select = "0.4"
 serde_json = "0.8.4"
 shlex = "0.1.1"
 slog = "1.5.2"

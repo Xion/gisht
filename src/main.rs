@@ -3,6 +3,7 @@
 //!
 
              extern crate ansi_term;
+             extern crate antidote;
              extern crate clap;
              extern crate conv;
 #[macro_use] extern crate enum_derive;
@@ -18,6 +19,7 @@
 #[macro_use] extern crate macro_attr;
 #[macro_use] extern crate maplit;
              extern crate regex;
+             extern crate select;
              extern crate serde_json;
              extern crate shlex;
              extern crate slog_envlogger;
