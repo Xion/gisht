@@ -7,9 +7,9 @@ use std::io::{self, Read, Write};
 
 use antidote::Mutex;
 use hyper::header::UserAgent;
+use regex::{self, Regex};
 use select::document::Document;
 use select::predicate::Predicate;
-use regex::{self, Regex};
 
 use ::USER_AGENT;
 use gist::{self, Gist};

@@ -107,7 +107,7 @@ lazy_static! {
         mozilla::ID => Arc::new(mozilla::create()) as Arc<Host>,
         paste_rs::ID => Arc::new(paste_rs::create()) as Arc<Host>,
         hastebin::ID => Arc::new(hastebin::Hastebin::new()) as Arc<Host>,
-        mibpaste::ID => Arc::new(mibpaste::Mibpaste::new()) as Arc<Host>,
+        mibpaste::ID => Arc::new(mibpaste::create()) as Arc<Host>,
         sprunge::ID => Arc::new(sprunge::Sprunge::new()) as Arc<Host>,
         dpaste_de::ID => Arc::new(dpaste_de::create()) as Arc<Host>,
         thepasteb_in::ID => Arc::new(thepasteb_in::create()) as Arc<Host>,

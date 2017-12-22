@@ -1,7 +1,7 @@
 //! Utility module.
 
 use std::fs;
-use std::io::{self, BufRead, BufReader};
+use std::io;
 use std::path::Path;
 
 use hyper::client::Client;
@@ -67,28 +67,6 @@ pub fn mark_executable<P: AsRef<Path>>(path: P) -> io::Result<()> {
     }
 
     Ok(())
-}
-
-
-/// Read the lines of text from given file into a vector of string.
-pub fn read_lines<P: AsRef<Path>>(path: P) -> io::Result<Vec<String>> {
-    let path = path.as_ref();
-    trace!("Reading lines of text from {}", path.display());
-
-    let file = try!(fs::File::open(path));
-    let reader = BufReader::new(file);
-
-    let mut result = vec![];
-    let (mut line_count, mut byte_count) = (0, 0);
-    for line in reader.lines() {
-        let line = try!(line);
-        line_count += 1;
-        byte_count += line.len();
-        result.push(line);
-    }
-
-    debug!("Read {} lines(s) ({} byte(s)) from {}", line_count, byte_count, path.display());
-    Ok(result)
 }
 
 
