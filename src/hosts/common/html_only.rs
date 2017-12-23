@@ -12,7 +12,7 @@ use select::predicate::Predicate;
 use ::USER_AGENT;
 use gist::Gist;
 use hosts::{FetchMode, Host};
-use util::http_client;
+use util::{http_client, LINESEP};
 use super::util::{ID_PLACEHOLDER, ImmutableGistHandler};
 
 
@@ -108,11 +108,26 @@ impl<P: Predicate + Clone + Send> HtmlOnly<P> {
 
         // Get the HTML nodes matching the predicate and concatenate their text content.
         let document = Document::from(html.as_str());
-        let code = document.find(self.code_predicate.lock().clone())
+        let mut code = document.find(self.code_predicate.lock().clone())
             .fold(String::new(), |mut s, node| {
                 s.push_str(node.text().as_str()); s
             });
 
-        self.handler.store_gist(gist, code.as_bytes())
+        // Ensure it ends with a newline, avoiding reallocation if possible.
+        if !code.ends_with(LINESEP) {
+            let code_len = code.len();
+            if code_len - code.trim_right().len() >= LINESEP.len() {
+                // TODO: replace with String::splice when it's stable
+                unsafe {
+                    code[code_len - LINESEP.len()..].as_bytes_mut()
+                       .copy_from_slice(LINESEP.as_bytes());
+                }
+            } else {
+                code = code.trim_right().to_owned() + LINESEP;
+            }
+        }
+
+        self.handler.store_gist(gist, code.as_bytes())?;
+        Ok(())
     }
 }

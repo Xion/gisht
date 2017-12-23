@@ -126,10 +126,11 @@ impl ImmutableGistHandler {
     }
 
     /// Store the downloaded content of a gist in the correct place.
+    /// Returns the number of bytes written.
     ///
     /// The exact means by which the gist content is obtained are specific
     /// to the particular host, so this method takes
-    pub fn store_gist<R: Read>(&self, gist: &Gist, mut content: R) -> io::Result<()> {
+    pub fn store_gist<R: Read>(&self, gist: &Gist, mut content: R) -> io::Result<usize> {
         // Save gist content under the gist path.
         // Note that Gist::path for single-file gists points to a file, not a directory,
         // so we need to ensure its *parent* exists.
@@ -140,7 +141,11 @@ impl ImmutableGistHandler {
             .create(true).write(true).truncate(true)
             .open(&path));
         let byte_count = io::copy(&mut content, &mut file)?;
-        trace!("Wrote {} byte(s) to {}", byte_count, path.display());
+        if byte_count == 0 {
+            warn!("Gist {} had zero bytes ({} is empty)", gist.uri, path.display());
+        } else {
+            trace!("Wrote {} byte(s) to {}", byte_count, path.display());
+        }
 
         // Make sure the gist's executable is, in fact, executable.
         let executable = path;
@@ -155,7 +160,7 @@ impl ImmutableGistHandler {
             trace!("Created symlink to gist executable: {}", binary.display());
         }
 
-        Ok(())
+        Ok(byte_count as usize)
     }
 }
 
@@ -238,6 +243,8 @@ impl ImmutableGistHandler {
             };
         };
 
+        // TODO: make sure the URL ends or doesn't end with a slash,
+        // depending on whether html_url_pattern does
         url
     }
 }

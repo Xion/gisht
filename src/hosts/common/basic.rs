@@ -101,7 +101,8 @@ impl Basic {
             .send()
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
 
-        self.handler.store_gist(gist, resp)
+        self.handler.store_gist(gist, resp)?;
+        Ok(())
     }
 }
 

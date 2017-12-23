@@ -8,6 +8,7 @@ mod common;
 
 mod github;
 mod bpaste;
+mod codesend;
 mod dpaste_de;
 mod hastebin;
 mod heypasteit;
@@ -131,6 +132,7 @@ lazy_static! {
         dpaste_de::ID => Arc::new(dpaste_de::create()) as Arc<Host>,
         thepasteb_in::ID => Arc::new(thepasteb_in::create()) as Arc<Host>,
         ix_io::ID => Arc::new(ix_io::Ix::new()) as Arc<Host>,
+        codesend::ID => Arc::new(codesend::create()) as Arc<Host>,
     };
 }
 #[cfg(not(test))]
