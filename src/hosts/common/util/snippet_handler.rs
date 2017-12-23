@@ -1,4 +1,4 @@
-//! Utility code shared by common gist host implementations.
+//! Module implementing the snippet handler.
 
 use std::borrow::Cow;
 use std::error::Error;
@@ -6,62 +6,39 @@ use std::fs;
 use std::io::{self, Read};
 
 use regex::{self, Regex};
-use url::Url;
 
 use gist::{self, Gist};
 use hosts::FetchMode;
 use util::{mark_executable, symlink_file};
+use super::{HTTP, HTTPS, ID_PLACEHOLDER, validate_url_pattern};
 
 
-/// Placeholder for gist IDs in URL patterns.
-pub const ID_PLACEHOLDER: &'static str = "${id}";
-
-// Known HTTP protocol prefixes.
-const HTTP: &'static str = "http://";
-const HTTPS: &'static str = "https://";
-
-/// Check the HTML URL pattern to see if it's valid.
-pub fn validate_url_pattern(pattern: &'static str) -> Result<(), Box<Error>> {
-    try!(Url::parse(pattern)
-        .map_err(|e| format!("`{}` is not a valid URL: {}", pattern, e)));
-
-    if ![HTTP, HTTPS].iter().any(|p| pattern.starts_with(p)) {
-        return Err(format!(
-            "URL pattern `{}` doesn't start with a known HTTP protocol",
-            pattern).into());
-    }
-    if !pattern.contains(ID_PLACEHOLDER) {
-        return Err(format!(
-            "URL pattern `{}` does not contain the ID placeholder `{}`",
-            pattern, ID_PLACEHOLDER).into());
-    }
-
-    Ok(())
-}
-
-
-/// Structure encapsulating the logic for handling immutable,
-/// single-file gists and their URLs.
+/// Structure encapsulating the logic for handling a particular kind of gists
+/// that we call "snippets".
 ///
-/// Supported types of gists are assumed to consist of only a single file (duh)
-/// and also to be immutable in a sense that they don't need to be updated
-/// once downloaded.
+/// Snippets are gists that:
+/// * consist of a single file (that has no meaningful name on its own)
+/// * which doesn't change once its posted
+///
+/// Those assumptions make it possible to manage the snippet as a single file
+/// (rather than a directory) which doesn't ever need to be updated
+/// (though FetchMode::Always can be honored).
 ///
 /// Individual gist hosts can instantiate this structure
 /// and delegate parts of their `Host` trait implementations here.
 #[derive(Debug)]
-pub struct ImmutableGistHandler {
+pub struct SnippetHandler {
     /// ID of the gist host.
-    pub(super) host_id: &'static str,
+    host_id: &'static str,
     /// User-visible name of the gist host.
-    pub(super) host_name: &'static str,
+    host_name: &'static str,
     /// Pattern for URLs pointing to browser pages of gists.
-    pub(super) html_url_pattern: &'static str,
+    html_url_pattern: &'static str,
     /// Regular expression for recognizing browser URLs
-    pub(super) html_url_re: Regex,
+    html_url_re: Regex,
 }
 
-impl ImmutableGistHandler {
+impl SnippetHandler {
     pub fn new(host_id: &'static str,
                host_name: &'static str,
                html_url_pattern: &'static str,
@@ -74,7 +51,7 @@ impl ImmutableGistHandler {
             regex::escape(html_url_pattern).replace(
                 &regex::escape(ID_PLACEHOLDER), &format!("(?P<id>{})", gist_id_re.as_str())));
 
-        Ok(ImmutableGistHandler{
+        Ok(SnippetHandler{
             host_id,
             host_name,
             html_url_pattern,
@@ -83,8 +60,29 @@ impl ImmutableGistHandler {
     }
 }
 
+// Accessors.
+impl SnippetHandler {
+    #[inline]
+    pub fn host_id(&self) -> &'static str { self.host_id }
+    #[inline]
+    pub fn host_name(&self) -> &'static str { self.host_name }
+    #[inline]
+    pub fn html_url_pattern(&self) -> &'static str { self.html_url_pattern }
+}
+#[cfg(test)]
+impl SnippetHandler {
+    #[inline]
+    pub fn html_url_regex(&self) -> &Regex { &self.html_url_re }
+
+    /// Returns the scheme + domain part of HTML URLs, like: http://example.com
+    pub fn html_url_origin(&self) -> String {
+        use url::Url;
+        Url::parse(self.html_url_pattern).unwrap().origin().unicode_serialization()
+    }
+}
+
 // Fetching gists.
-impl ImmutableGistHandler {
+impl SnippetHandler {
     /// Return a "resolved" Gist that has the host ID associated with it.
     pub fn resolve_gist<'g>(&self, gist: &'g Gist) -> Cow<'g, Gist> {
         debug!("Resolving {} gist: {:?}", self.host_name, gist);
@@ -165,7 +163,7 @@ impl ImmutableGistHandler {
 }
 
 // Working with gist URLs.
-impl ImmutableGistHandler {
+impl SnippetHandler {
     /// Return the URL to gist's HTML website.
     /// This method can be pass-through called by Host::gist_url.
     pub fn gist_url(&self, gist: &Gist) -> io::Result<String> {
@@ -212,7 +210,7 @@ impl ImmutableGistHandler {
     }
 
     /// Make given URL resemble the gist URLs of the host
-    /// which uses this instance of ImmutableGistHandler.
+    /// which uses this instance of SnippetHandler.
     fn canonicalize_url<'u>(&self, url: &'u str) -> Cow<'u, str> {
         let mut url = Cow::Borrowed(url.trim());
 
@@ -250,7 +248,7 @@ impl ImmutableGistHandler {
 }
 
 // Other utility methods.
-impl ImmutableGistHandler {
+impl SnippetHandler {
     /// Check if given Gist is for this host. Invoke using try!().
     fn ensure_host_id(&self, gist: &Gist) -> io::Result<()> {
         if gist.uri.host_id != self.host_id {

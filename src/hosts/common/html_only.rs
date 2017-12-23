@@ -13,7 +13,8 @@ use ::USER_AGENT;
 use gist::Gist;
 use hosts::{FetchMode, Host};
 use util::{http_client, LINESEP};
-use super::util::{ID_PLACEHOLDER, ImmutableGistHandler};
+use super::util::ID_PLACEHOLDER;
+use super::util::snippet_handler::SnippetHandler;
 
 
 /// HTML-only gist host.
@@ -27,7 +28,7 @@ use super::util::{ID_PLACEHOLDER, ImmutableGistHandler};
 #[cfg_attr(test, repr(C))]  // TODO: remove when `impl Trait` is stable
 pub struct HtmlOnly<P: Predicate + Clone + Send> {
     /// Helper object for handling URL & gist resolve logic.
-    handler: ImmutableGistHandler,
+    handler: SnippetHandler,
     /// Predicate for finding gist code in the HTML page.
     code_predicate: Mutex<P>,  // for Host: Send + Sync
 }
@@ -39,10 +40,8 @@ impl<P: Predicate + Clone + Send> HtmlOnly<P> {
                html_url_pattern: &'static str,
                gist_id_re: Regex,
                code_predicate: P) -> Result<Self, Box<Error>> {
-        let handler =
-            ImmutableGistHandler::new(id, name, html_url_pattern, gist_id_re)?;
         Ok(HtmlOnly {
-            handler,
+            handler: SnippetHandler::new(id, name, html_url_pattern, gist_id_re)?,
             code_predicate: Mutex::new(code_predicate),
         })
     }
@@ -51,19 +50,17 @@ impl<P: Predicate + Clone + Send> HtmlOnly<P> {
 // Accessors / getters, used for testing of individual host setups.
 #[cfg(test)]
 impl<P: Predicate + Clone + Send> HtmlOnly<P> {
-    pub fn html_url_regex(&self) -> &Regex { &self.handler.html_url_re }
+    pub fn html_url_regex(&self) -> &Regex { &self.handler.html_url_regex() }
 
     /// Returns the scheme + domain part of HTML URLs, like: http://example.com
     pub fn html_url_origin(&self) -> String {
-        use url::Url;
-        Url::parse(self.handler.html_url_pattern).unwrap()
-            .origin().unicode_serialization()
+        self.handler.html_url_origin()
     }
 }
 
 impl<P: Predicate + Clone + Send> Host for HtmlOnly<P> {
-    fn id(&self) -> &'static str { self.handler.host_id }
-    fn name(&self) -> &'static str { self.handler.host_name }
+    fn id(&self) -> &'static str { self.handler.host_id() }
+    fn name(&self) -> &'static str { self.handler.host_name() }
 
     /// Fetch the gist from remote host.
     fn fetch_gist(&self, gist: &Gist, mode: FetchMode) -> io::Result<()> {
@@ -95,7 +92,7 @@ impl<P: Predicate + Clone + Send> HtmlOnly<P> {
         let http = http_client();
 
         // Download the gist using the HTML URL pattern.
-        let url = self.handler.html_url_pattern
+        let url = self.handler.html_url_pattern()
             .replace(ID_PLACEHOLDER, gist.id.as_ref().unwrap());
         debug!("Downloading {} gist from {}", self.name(), url);
         let mut resp = try!(http.get(&url)

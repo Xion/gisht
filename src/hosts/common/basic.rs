@@ -10,7 +10,8 @@ use ::USER_AGENT;
 use gist::Gist;
 use hosts::{FetchMode, Host};
 use util::http_client;
-use super::util::{ID_PLACEHOLDER, ImmutableGistHandler, validate_url_pattern};
+use super::util::{ID_PLACEHOLDER, validate_url_pattern};
+use super::util::snippet_handler::SnippetHandler;
 
 
 /// Basic gist host.
@@ -26,7 +27,7 @@ use super::util::{ID_PLACEHOLDER, ImmutableGistHandler, validate_url_pattern};
 #[derive(Debug)]
 pub struct Basic {
     /// Helper object for handling URL & gist resolve logic.
-    handler: ImmutableGistHandler,
+    handler: SnippetHandler,
     /// Pattern for "raw" URLs used to download gists.
     raw_url_pattern: &'static str,
 }
@@ -39,12 +40,9 @@ impl Basic {
                raw_url_pattern: &'static str,
                html_url_pattern: &'static str,
                gist_id_re: Regex) -> Result<Self, Box<Error>> {
-        let handler =
-            ImmutableGistHandler::new(id, name, html_url_pattern, gist_id_re)?;
         try!(validate_url_pattern(raw_url_pattern));
-
         Ok(Basic {
-            handler,
+            handler: SnippetHandler::new(id, name, html_url_pattern, gist_id_re)?,
             raw_url_pattern: raw_url_pattern,
         })
     }
@@ -53,19 +51,17 @@ impl Basic {
 // Accessors / getters, used for testing of individual host setups.
 #[cfg(test)]
 impl Basic {
-    pub fn html_url_regex(&self) -> &Regex { &self.handler.html_url_re }
+    pub fn html_url_regex(&self) -> &Regex { &self.handler.html_url_regex() }
 
     /// Returns the scheme + domain part of HTML URLs, like: http://example.com
     pub fn html_url_origin(&self) -> String {
-        use url::Url;
-        Url::parse(self.handler.html_url_pattern).unwrap()
-            .origin().unicode_serialization()
+        self.handler.html_url_origin()
     }
 }
 
 impl Host for Basic {
-    fn id(&self) -> &'static str { self.handler.host_id }
-    fn name(&self) -> &'static str { self.handler.host_name }
+    fn id(&self) -> &'static str { self.handler.host_id() }
+    fn name(&self) -> &'static str { self.handler.host_name() }
 
     /// Fetch the gist from remote host.
     fn fetch_gist(&self, gist: &Gist, mode: FetchMode) -> io::Result<()> {
