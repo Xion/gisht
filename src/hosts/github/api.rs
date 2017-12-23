@@ -13,9 +13,8 @@ use url::Url;
 use ::USER_AGENT;
 use ext::hyper::header::Link;
 use gist::{self, Datum, Gist};
-use util::http_client;
+use util::{http_client, read_json};
 use super::ID;
-use super::util::read_json;
 
 
 /// Base URL for GitHub API requests.
@@ -128,7 +127,8 @@ impl<'o> GistsIterator<'o> {
             .send());
 
         // Parse the response as JSON array and extract gist names from it.
-        let gists_json = read_json(&mut resp);
+        // TODO: handle the (unlikely) JSON parse error here
+        let gists_json = read_json(&mut resp).unwrap();
         if let Json::Array(gists) = gists_json {
             let page_size = gists.len();
             self.gists_json_array = Some(gists);
@@ -188,11 +188,11 @@ pub fn get_gist_info(gist_id: &str) -> io::Result<Json> {
 
     debug!("Getting GitHub gist info from {}", gist_url);
     let mut resp = try!(simple_get(gist_url));
-    Ok(read_json(&mut resp))
+    read_json(&mut resp)
 }
 
 /// Build the complete gist Info from its GitHub JSON representation.
-/// If fields are non-empty, only selected fields are included in the info.
+/// If `data` is non-empty, only selected fields are included in the info.
 pub fn build_gist_info(info: &Json, data: &[Datum]) -> gist::Info {
     let mut data: Vec<_> = data.to_vec();
     if data.is_empty() {

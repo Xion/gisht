@@ -3,7 +3,9 @@
 mod basic;
 mod html_only;
 
-mod util;
+// TODO: this module should probably go out of `common` since it's used
+// by standalone gist host implementations too
+pub mod util;
 
 
 pub use self::basic::Basic;

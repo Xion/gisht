@@ -6,7 +6,6 @@
 mod api;
 mod git;
 mod storage;
-mod util;
 
 
 use std::borrow::Cow;
@@ -26,12 +25,14 @@ use self::storage::{needs_update, update_gist, clone_gist};
 pub const ID: &'static str = "gh";
 
 
+/// GitHub gist host.
 #[derive(Debug)]
 pub struct GitHub {
     _marker: PhantomData<()>,
 }
 
 impl GitHub {
+    #[inline]
     pub fn new() -> Self {
         GitHub { _marker: PhantomData }
     }

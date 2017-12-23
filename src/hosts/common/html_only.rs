@@ -64,6 +64,7 @@ impl<P: Predicate + Clone + Send> Host for HtmlOnly<P> {
 
     /// Fetch the gist from remote host.
     fn fetch_gist(&self, gist: &Gist, mode: FetchMode) -> io::Result<()> {
+        self.handler.ensure_host_id(gist)?;
         let gist = self.handler.resolve_gist(gist);
         if self.handler.need_fetch(&*gist, mode)? {
             self.download_gist(&*gist)?;

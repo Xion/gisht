@@ -1,12 +1,15 @@
 //! Utility module.
 
 use std::fs;
-use std::io;
+use std::io::{self, Read};
 use std::path::Path;
+use std::str::FromStr;
 
-use hyper::client::Client;
+use hyper::client::{Client, Response};
+use hyper::header::ContentLength;
 use hyper::net::HttpsConnector;
 use hyper_native_tls::NativeTlsClient;
+use serde_json::Value as Json;
 
 
 /// Like try!(), but returns Some(Err(err)) in case of error.
@@ -75,4 +78,15 @@ pub fn http_client() -> Client {
     let ssl = NativeTlsClient::new().unwrap();
     let connector = HttpsConnector::new(ssl);
     Client::with_connector(connector)
+}
+
+/// Read HTTP response from hyper and parse it as JSON.
+pub fn read_json(response: &mut Response) -> io::Result<Json> {
+    let mut body = match response.headers.get::<ContentLength>() {
+        Some(&ContentLength(l)) => String::with_capacity(l as usize),
+        _ => String::new(),
+    };
+    response.read_to_string(&mut body).unwrap();
+    Json::from_str(&body)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))
 }

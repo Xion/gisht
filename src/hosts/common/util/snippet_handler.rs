@@ -90,7 +90,7 @@ impl SnippetHandler {
         match gist.id {
             Some(_) => gist,
             None => {
-                // Single-file gists do actually contain the ID, but it's parsed as `name` part
+                // Snippets actually contain the ID, but it's parsed as `name` part
                 // of the URI. (The gists do not have independent, user-provided names).
                 // So all we need to do is to just copy that ID.
                 let id = gist.uri.name.clone();
@@ -250,7 +250,7 @@ impl SnippetHandler {
 // Other utility methods.
 impl SnippetHandler {
     /// Check if given Gist is for this host. Invoke using try!().
-    fn ensure_host_id(&self, gist: &Gist) -> io::Result<()> {
+    pub fn ensure_host_id(&self, gist: &Gist) -> io::Result<()> {
         if gist.uri.host_id != self.host_id {
             return Err(io::Error::new(io::ErrorKind::InvalidData, format!(
                 "expected a {} gist, but got a '{}' one",
